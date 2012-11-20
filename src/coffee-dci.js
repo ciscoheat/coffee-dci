@@ -9,15 +9,25 @@
 
   top.Ivento.Dci.Context = Context = (function() {
 
-    function Context() {}
+    function Context(__contextProperty) {
+      this.__contextProperty = __contextProperty;
+    }
 
     Context.prototype.bind = function(rolePlayer) {
-      return Context.bind(this, rolePlayer);
+      return Context.bind(this, rolePlayer, this.__contextProperty);
     };
 
-    Context.bind = function(context, rolePlayer) {
-      var cacheName;
-      cacheName = "__methodCache";
+    Context.isFunction = function(obj) {
+      return !!(obj && obj.constructor && obj.call && obj.apply);
+    };
+
+    Context.bind = function(context, rolePlayer, contextProperty) {
+      var _base1;
+      if (contextProperty == null) {
+        contextProperty = 'context';
+      }
+      context.__contextCache || (context.__contextCache = {});
+      (_base1 = context.__contextCache)[rolePlayer] || (_base1[rolePlayer] = {});
       return {
         to: function(role) {
           var applyRoleMethod, assignRoleMethod, cache, field, prop, roleName, unbind;
@@ -29,46 +39,38 @@
               return role[name].apply(rolePlayer, arguments);
             };
           };
-          assignRoleMethod = function(prop) {
-            if (role.hasOwnProperty(prop)) {
-              if (rolePlayer.hasOwnProperty(prop)) {
-                rolePlayer[cacheName] || (rolePlayer[cacheName] = {});
-                rolePlayer[cacheName][prop] = rolePlayer[prop];
-              }
-              return rolePlayer[prop] = applyRoleMethod(prop);
+          assignRoleMethod = function(prop, value) {
+            if (value == null) {
+              value = null;
             }
+            cache = rolePlayer.hasOwnProperty(prop) ? rolePlayer[prop] : false;
+            context.__contextCache[rolePlayer][prop] = cache;
+            return rolePlayer[prop] = value != null ? value : applyRoleMethod(prop);
           };
           for (prop in role) {
             field = role[prop];
-            assignRoleMethod(prop);
-          }
-          if (rolePlayer.hasOwnProperty('context')) {
-            rolePlayer[cacheName] || (rolePlayer[cacheName] = {});
-            rolePlayer[cacheName]['context'] = rolePlayer['context'];
-          }
-          rolePlayer['context'] = context;
-          unbind = rolePlayer.unbind;
-          if (unbind) {
-            cache.unbind = unbind;
-          }
-          rolePlayer.unbind = function() {
-            prop = void 0;
-            cache = rolePlayer[cacheName];
-            for (prop in role) {
-              field = role[prop];
-              if (role.hasOwnProperty(prop) && rolePlayer.hasOwnProperty(prop)) {
-                delete rolePlayer[prop];
-              }
+            if (role.hasOwnProperty(prop)) {
+              assignRoleMethod(prop);
             }
-            delete rolePlayer.unbind;
-            if (cache) {
-              for (prop in cache) {
-                field = cache[prop];
-                rolePlayer[prop] = cache[prop];
+          }
+          assignRoleMethod(contextProperty, context);
+          if (!(context.unbind != null)) {
+            context.unbind = function() {
+              var player;
+              for (player in context.__contextCache) {
+                for (prop in context.__contextCache[player]) {
+                  cache = context.__contextCache[player][prop];
+                  if (cache) {
+                    rolePlayer[prop] = cache;
+                  } else {
+                    delete rolePlayer[prop];
+                  }
+                }
               }
-            }
-            return context[roleName] = context.prototype[roleName];
-          };
+              context[roleName] = context.constructor.prototype[roleName];
+              return delete context.unbind;
+            };
+          }
           for (prop in context) {
             field = context[prop];
             if (field === role) {
