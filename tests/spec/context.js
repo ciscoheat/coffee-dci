@@ -94,8 +94,16 @@
       it("should modify the rolePlayers correctly", function() {
         ctx.increaseBalance(200);
         expect(ctx.balance()).toEqual(1300);
+        expect(ctx.ledgers.entries[2]).toEqual({
+          message: "Depositing",
+          amount: 200
+        });
         ctx.decreaseBalance(1500);
-        return expect(ctx.balance()).toEqual(-200);
+        expect(ctx.balance()).toEqual(-200);
+        return expect(ctx.ledgers.entries[3]).toEqual({
+          message: "Withdrawing",
+          amount: -1500
+        });
       });
       return it("should bind to objects not using inheritance with the static method.", function() {
         var simple;
@@ -154,8 +162,9 @@
       });
     });
     return describe("Unbinding behavior", function() {
-      var SpiderMan, SuperMan, man;
+      var SpiderMan, SuperMan, man, superMan;
       man = null;
+      superMan = null;
       beforeEach(function() {
         return man = {
           name: "Clark Kent",
@@ -192,11 +201,13 @@
             return "wzzzt!";
           },
           fly: function() {
+            expect(this).toBe(man);
             return "wheee!";
           }
         };
 
         SuperMan.prototype.execute = function() {
+          expect(this).toBe(superMan);
           return this.superman.fly();
         };
 
@@ -204,21 +215,22 @@
 
       })(Ivento.Dci.Context);
       it("should have an unbind method added after the first bind", function() {
-        var spider, superMan;
+        var spider;
         spider = new SpiderMan(man);
         expect(spider.unbind).toBeUndefined();
         superMan = new SuperMan(man);
         return expect(superMan.unbind).toBeDefined();
       });
       return it("unbind() should remove the role methods from the rolePlayer", function() {
-        var superMan;
         superMan = new SuperMan(man);
         expect(man.useXRay()).toEqual("wzzzt!");
         expect(man.fly()).toEqual("wheee!");
+        expect(superMan.superman.name).toBeDefined();
         superMan.unbind();
         expect(man.fly).toBeUndefined();
         expect(man.useXRay()).toEqual("Prevented by glasses.");
-        return expect(superMan.unbind).toBeUndefined();
+        expect(superMan.unbind).toBeUndefined();
+        return expect(superMan.superman.name).toBeUndefined();
       });
     });
   });

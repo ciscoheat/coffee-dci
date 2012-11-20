@@ -6,17 +6,12 @@ top.Ivento.Dci or= {}
 # Context class
 top.Ivento.Dci.Context = class Context
 
-	constructor: (@__contextProperty = 'context') ->
-
 	bind: (rolePlayer) ->
-		Context.bind @, rolePlayer, @.__contextProperty
-
-	@isFunction: (obj) -> !!(obj && obj.constructor && obj.call && obj.apply)
+		Context.bind @, rolePlayer
 
 	# rolePlayer: Object passed to Context in constructor
-	@bind: (context, rolePlayer, contextProperty = 'context') ->
-		context.__contextCache or= {}
-		context.__contextCache[rolePlayer] or= {}
+	@bind: (context, rolePlayer) ->
+		cacheName = "__methodCache"
 		# role: Role object in Context
 		to: (role) ->
 			cache = null
@@ -26,30 +21,35 @@ top.Ivento.Dci.Context = class Context
 			applyRoleMethod = (name) ->
 				-> role[name].apply rolePlayer, arguments
 
-			assignRoleMethod = (prop, value = null) ->
-				# This value is used during unbind.
-				# If a property, restore value. If false, delete value.
-				cache = if rolePlayer.hasOwnProperty(prop) then rolePlayer[prop] else false
-				context.__contextCache[rolePlayer][prop] = cache
-				rolePlayer[prop] = value ? applyRoleMethod prop
+			assignRoleMethod = (prop) ->
+				if role.hasOwnProperty(prop)
+					if rolePlayer.hasOwnProperty(prop)
+						rolePlayer[cacheName] or= {}
+						rolePlayer[cacheName][prop] = rolePlayer[prop]
+					rolePlayer[prop] = applyRoleMethod prop
 
-			assignRoleMethod prop for prop, field of role when role.hasOwnProperty prop
+			assignRoleMethod prop for prop, field of role
 
-			# Assign context property to role
-			assignRoleMethod contextProperty, context
+			if rolePlayer.hasOwnProperty('context')
+				rolePlayer[cacheName] or= {}
+				rolePlayer[cacheName]['context'] = rolePlayer['context']
+			rolePlayer['context'] = context
 
-			# Assign unbind method to context
-			context.unbind or= ->
-				for player of context.__contextCache
-					for prop of context.__contextCache[player]
-						cache = context.__contextCache[player][prop]
-						if cache then rolePlayer[prop] = cache else delete rolePlayer[prop]
-				
-				# Restore original context role
-				context[roleName] = context.constructor.prototype[roleName]
-				delete context.unbind
+			unbind = rolePlayer.unbind
+			cache.unbind = unbind if unbind
+			rolePlayer.unbind = ->
+				prop = undefined
+				cache = rolePlayer[cacheName]
+				for prop, field of role
+					delete rolePlayer[prop] if role.hasOwnProperty(prop) and rolePlayer.hasOwnProperty(prop)
+				delete rolePlayer.unbind
+		
+				if cache
+					for prop, field of cache
+						rolePlayer[prop] = cache[prop]
 
-			# Assign roleplayer to role in context.
+				context[roleName] = context.prototype[roleName]
+
 			for prop, field of context
 				if field is role
 					roleName = prop

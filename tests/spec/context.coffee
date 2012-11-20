@@ -64,9 +64,11 @@ describe "Ivento.Dci.Context", ->
 		it "should modify the rolePlayers correctly", ->
 			ctx.increaseBalance 200
 			expect(ctx.balance()).toEqual(1300)
+			expect(ctx.ledgers.entries[2]).toEqual(message: "Depositing", amount: 200)
 
 			ctx.decreaseBalance 1500
 			expect(ctx.balance()).toEqual(-200)
+			expect(ctx.ledgers.entries[3]).toEqual(message: "Withdrawing", amount: -1500)
 
 		it "should bind to objects not using inheritance with the static method.", ->
 			simple = new SimplerAccount entries
@@ -120,6 +122,7 @@ describe "Ivento.Dci.Context", ->
 	describe "Unbinding behavior", ->
 		
 		man = null
+		superMan = null
 
 		beforeEach ->
 			man = 
@@ -139,9 +142,16 @@ describe "Ivento.Dci.Context", ->
 
 			superman:
 				useXRay: () -> "wzzzt!"
-				fly: () -> "wheee!"
 
-			execute: () -> @superman.fly()
+				fly: () -> 
+					# Testing for equality with roleplayer
+					expect(@).toBe(man)
+					"wheee!"
+
+			execute: () -> 
+				# Testing for equality with context
+				expect(@).toBe(superMan)
+				@superman.fly()
 
 		it "should have an unbind method added after the first bind", ->
 			spider = new SpiderMan man
@@ -156,8 +166,12 @@ describe "Ivento.Dci.Context", ->
 			expect(man.useXRay()).toEqual("wzzzt!")
 			expect(man.fly()).toEqual("wheee!")
 
+			expect(superMan.superman.name).toBeDefined()
+
 			superMan.unbind()
 
 			expect(man.fly).toBeUndefined()
 			expect(man.useXRay()).toEqual("Prevented by glasses.")
+			
 			expect(superMan.unbind).toBeUndefined()
+			expect(superMan.superman.name).toBeUndefined()
