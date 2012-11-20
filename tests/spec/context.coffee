@@ -90,7 +90,7 @@ describe "Ivento.Dci.Context", ->
 
 				transfer: (amount) ->
 					@context.destination.deposit amount
-					@context.source.withdraw amount # Also works with "@withdraw amount"
+					@withdraw amount
 
 			destination:
 				deposit: (amount) -> 

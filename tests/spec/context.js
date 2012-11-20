@@ -127,7 +127,7 @@
           },
           transfer: function(amount) {
             this.context.destination.deposit(amount);
-            return this.context.source.withdraw(amount);
+            return this.withdraw(amount);
           }
         };
 
