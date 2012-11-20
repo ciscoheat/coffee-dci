@@ -20,7 +20,7 @@
       cacheName = "__methodCache";
       return {
         to: function(role) {
-          var applyRoleMethod, cache, field, prop, roleName, unbind;
+          var applyRoleMethod, assignRoleMethod, cache, field, prop, roleName, unbind;
           cache = null;
           unbind = null;
           roleName = null;
@@ -29,16 +29,24 @@
               return role[name].apply(rolePlayer, arguments);
             };
           };
-          for (prop in role) {
-            field = role[prop];
+          assignRoleMethod = function(prop) {
             if (role.hasOwnProperty(prop)) {
               if (rolePlayer.hasOwnProperty(prop)) {
                 rolePlayer[cacheName] || (rolePlayer[cacheName] = {});
                 rolePlayer[cacheName][prop] = rolePlayer[prop];
               }
-              rolePlayer[prop] = applyRoleMethod(prop);
+              return rolePlayer[prop] = applyRoleMethod(prop);
             }
+          };
+          for (prop in role) {
+            field = role[prop];
+            assignRoleMethod(prop);
           }
+          if (rolePlayer.hasOwnProperty('context')) {
+            rolePlayer[cacheName] || (rolePlayer[cacheName] = {});
+            rolePlayer[cacheName]['context'] = rolePlayer['context'];
+          }
+          rolePlayer['context'] = context;
           unbind = rolePlayer.unbind;
           if (unbind) {
             cache.unbind = unbind;

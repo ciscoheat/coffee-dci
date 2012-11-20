@@ -1,8 +1,10 @@
 describe "Ivento.Dci.Context", ->
 
 	class Account extends Ivento.Dci.Context
-		constructor: (entriesArray) ->
+		constructor: (entriesArray = []) ->
 			@bind(entries: entriesArray).to(@ledgers)
+
+		# ===== Roles =====
 
 		ledgers:
 			addEntry: (message, amount) ->
@@ -10,7 +12,10 @@ describe "Ivento.Dci.Context", ->
 			getBalance: () ->
 				@entries.reduce ((prev, curr) -> prev + curr.amount), 0
 		
-		balance: () -> @ledgers.getBalance()
+		# ===== End roles =====
+
+		balance: () -> 
+			@ledgers.getBalance()
 
 		increaseBalance: (amount) ->
 			@ledgers.addEntry "Depositing", amount
@@ -18,15 +23,22 @@ describe "Ivento.Dci.Context", ->
 		decreaseBalance: (amount) ->
 			@ledgers.addEntry "Withdrawing", -amount
 
+
 	class SimplerAccount
 		constructor: (entriesArray) ->
+			# Binding using the static method.
 			Ivento.Dci.Context.bind(@, entries: entriesArray).to(@ledgers)
+
+		# ===== Roles =====
 
 		ledgers:
 			getBalance: () ->
 				@entries.reduce ((prev, curr) -> prev + curr.amount), 0
+
+		# ===== End roles =====
 		
 		balance: () -> @ledgers.getBalance()
+
 
 	ctx = null
 	entries = null
@@ -59,3 +71,48 @@ describe "Ivento.Dci.Context", ->
 		it "should bind to objects not using inheritance with the static method.", ->
 			simple = new SimplerAccount entries
 			expect(simple.balance()).toEqual(1100)
+
+	describe "MoneyTransfer Context", ->
+		
+		class MoneyTransfer extends Ivento.Dci.Context
+			constructor: (source, destination, amount) ->
+				@bind(source).to(@source)
+				@bind(destination).to(@destination)
+				@bind(amount).to(@amount)
+
+			# ===== Roles =====
+
+			source:
+				withdraw: (amount) -> 
+					@decreaseBalance amount
+
+				transfer: (amount) ->
+					@context.destination.deposit amount
+					@context.source.withdraw amount
+
+			destination:
+				deposit: (amount) -> 
+					@increaseBalance amount
+
+			amount: 
+				{}
+
+			# ===== End roles =====
+
+			transfer: () -> 
+				@source.transfer @amount
+
+		it "should transfer money using Accounts", ->
+			
+			src = new Account entries
+			dest = new Account
+			amount = 200
+
+			expect(src.balance()).toEqual(1100)
+			expect(dest.balance()).toEqual(0)
+
+			context = new MoneyTransfer src, dest, amount
+			context.transfer()
+
+			expect(src.balance()).toEqual(900)
+			expect(dest.balance()).toEqual(200)

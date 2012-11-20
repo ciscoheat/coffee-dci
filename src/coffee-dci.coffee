@@ -21,12 +21,19 @@ top.Ivento.Dci.Context = class Context
 			applyRoleMethod = (name) ->
 				-> role[name].apply rolePlayer, arguments
 
-			for prop, field of role
+			assignRoleMethod = (prop) ->
 				if role.hasOwnProperty(prop)
 					if rolePlayer.hasOwnProperty(prop)
 						rolePlayer[cacheName] or= {}
 						rolePlayer[cacheName][prop] = rolePlayer[prop]
 					rolePlayer[prop] = applyRoleMethod prop
+
+			assignRoleMethod prop for prop, field of role
+
+			if rolePlayer.hasOwnProperty('context')
+				rolePlayer[cacheName] or= {}
+				rolePlayer[cacheName]['context'] = rolePlayer['context']
+			rolePlayer['context'] = context
 
 			unbind = rolePlayer.unbind
 			cache.unbind = unbind if unbind

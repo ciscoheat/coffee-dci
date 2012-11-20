@@ -9,6 +9,9 @@
       __extends(Account, _super);
 
       function Account(entriesArray) {
+        if (entriesArray == null) {
+          entriesArray = [];
+        }
         this.bind({
           entries: entriesArray
         }).to(this.ledgers);
@@ -68,7 +71,7 @@
     })();
     ctx = null;
     entries = null;
-    return describe("Binding behaviour", function() {
+    describe("Binding behaviour", function() {
       beforeEach(function() {
         entries = [
           {
@@ -98,6 +101,56 @@
         var simple;
         simple = new SimplerAccount(entries);
         return expect(simple.balance()).toEqual(1100);
+      });
+    });
+    return describe("MoneyTransfer Context", function() {
+      var MoneyTransfer;
+      MoneyTransfer = (function(_super) {
+
+        __extends(MoneyTransfer, _super);
+
+        function MoneyTransfer(source, destination, amount) {
+          this.bind(source).to(this.source);
+          this.bind(destination).to(this.destination);
+          this.bind(amount).to(this.amount);
+        }
+
+        MoneyTransfer.prototype.source = {
+          withdraw: function(amount) {
+            return this.decreaseBalance(amount);
+          },
+          transfer: function(amount) {
+            this.context.destination.deposit(amount);
+            return this.context.source.withdraw(amount);
+          }
+        };
+
+        MoneyTransfer.prototype.destination = {
+          deposit: function(amount) {
+            return this.increaseBalance(amount);
+          }
+        };
+
+        MoneyTransfer.prototype.amount = {};
+
+        MoneyTransfer.prototype.transfer = function() {
+          return this.source.transfer(this.amount);
+        };
+
+        return MoneyTransfer;
+
+      })(Ivento.Dci.Context);
+      return it("should transfer money using Accounts", function() {
+        var amount, context, dest, src;
+        src = new Account(entries);
+        dest = new Account;
+        amount = 200;
+        expect(src.balance()).toEqual(1100);
+        expect(dest.balance()).toEqual(0);
+        context = new MoneyTransfer(src, dest, amount);
+        context.transfer();
+        expect(src.balance()).toEqual(900);
+        return expect(dest.balance()).toEqual(200);
       });
     });
   });
