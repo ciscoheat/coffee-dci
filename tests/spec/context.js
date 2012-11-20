@@ -8,24 +8,22 @@
 
       __extends(Account, _super);
 
-      function Account(entriesArray) {
-        if (entriesArray == null) {
-          entriesArray = [];
+      function Account(entries) {
+        if (entries == null) {
+          entries = [];
         }
-        this.bind({
-          entries: entriesArray
-        }).to(this.ledgers);
+        this.bind(entries).to(this.ledgers);
       }
 
       Account.prototype.ledgers = {
         addEntry: function(message, amount) {
-          return this.entries.push({
+          return this.push({
             message: message,
             amount: amount
           });
         },
         getBalance: function() {
-          return this.entries.reduce((function(prev, curr) {
+          return this.reduce((function(prev, curr) {
             return prev + curr.amount;
           }), 0);
         }
@@ -85,7 +83,7 @@
     });
     describe("Binding behaviour", function() {
       it("should bind objects to roles using the bind() method", function() {
-        expect(ctx.ledgers.entries).toBe(entries);
+        expect(ctx.ledgers).toBe(entries);
         return expect(ctx.ledgers.getBalance()).toEqual(1100);
       });
       it("should be able to use the context methods", function() {
@@ -94,13 +92,13 @@
       it("should modify the rolePlayers correctly", function() {
         ctx.increaseBalance(200);
         expect(ctx.balance()).toEqual(1300);
-        expect(ctx.ledgers.entries[2]).toEqual({
+        expect(ctx.ledgers[2]).toEqual({
           message: "Depositing",
           amount: 200
         });
         ctx.decreaseBalance(1500);
         expect(ctx.balance()).toEqual(-200);
-        return expect(ctx.ledgers.entries[3]).toEqual({
+        return expect(ctx.ledgers[3]).toEqual({
           message: "Withdrawing",
           amount: -1500
         });
@@ -157,6 +155,7 @@
         expect(dest.balance()).toEqual(0);
         context = new MoneyTransfer(src, dest, amount);
         context.transfer();
+        context.unbind();
         expect(src.balance()).toEqual(900);
         return expect(dest.balance()).toEqual(200);
       });

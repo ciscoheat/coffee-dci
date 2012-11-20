@@ -1,17 +1,17 @@
 describe "Ivento.Dci.Context", ->
 
 	class Account extends Ivento.Dci.Context
-		constructor: (entriesArray = []) ->
-			@bind(entries: entriesArray).to(@ledgers)
+		constructor: (entries = []) ->
+			@bind(entries).to(@ledgers)
 
 		# ===== Roles =====
 
 		ledgers:
 			addEntry: (message, amount) ->
-				@entries.push message: message, amount: amount
+				@push message: message, amount: amount
 
 			getBalance: () ->
-				@entries.reduce ((prev, curr) -> prev + curr.amount), 0
+				@reduce ((prev, curr) -> prev + curr.amount), 0
 		
 		# ===== End roles =====
 
@@ -55,7 +55,7 @@ describe "Ivento.Dci.Context", ->
 	describe "Binding behaviour", ->
 
 		it "should bind objects to roles using the bind() method", ->
-			expect(ctx.ledgers.entries).toBe(entries)
+			expect(ctx.ledgers).toBe(entries)
 			expect(ctx.ledgers.getBalance()).toEqual(1100)
 
 		it "should be able to use the context methods", ->
@@ -64,11 +64,11 @@ describe "Ivento.Dci.Context", ->
 		it "should modify the rolePlayers correctly", ->
 			ctx.increaseBalance 200
 			expect(ctx.balance()).toEqual(1300)
-			expect(ctx.ledgers.entries[2]).toEqual(message: "Depositing", amount: 200)
+			expect(ctx.ledgers[2]).toEqual(message: "Depositing", amount: 200)
 
 			ctx.decreaseBalance 1500
 			expect(ctx.balance()).toEqual(-200)
-			expect(ctx.ledgers.entries[3]).toEqual(message: "Withdrawing", amount: -1500)
+			expect(ctx.ledgers[3]).toEqual(message: "Withdrawing", amount: -1500)
 
 		it "should bind to objects not using inheritance with the static method.", ->
 			simple = new SimplerAccount entries
@@ -115,6 +115,7 @@ describe "Ivento.Dci.Context", ->
 
 			context = new MoneyTransfer src, dest, amount
 			context.transfer()
+			context.unbind()
 
 			expect(src.balance()).toEqual(900)
 			expect(dest.balance()).toEqual(200)
