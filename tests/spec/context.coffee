@@ -9,6 +9,7 @@ describe "Ivento.Dci.Context", ->
 		ledgers:
 			addEntry: (message, amount) ->
 				@entries.push message: message, amount: amount
+
 			getBalance: () ->
 				@entries.reduce ((prev, curr) -> prev + curr.amount), 0
 		
@@ -39,20 +40,19 @@ describe "Ivento.Dci.Context", ->
 		
 		balance: () -> @ledgers.getBalance()
 
-
 	ctx = null
 	entries = null
 
+	beforeEach ->
+		entries = [
+			message: "Start", amount: 100
+		,
+			message: "First deposit", amount: 1000
+		]
+
+		ctx = new Account entries
+
 	describe "Binding behaviour", ->
-
-		beforeEach ->
-			entries = [
-				message: "Start", amount: 100
-			,
-				message: "First deposit", amount: 1000
-			]
-
-			ctx = new Account entries
 
 		it "should bind objects to roles using the bind() method", ->
 			expect(ctx.ledgers.entries).toBe(entries)
@@ -88,7 +88,7 @@ describe "Ivento.Dci.Context", ->
 
 				transfer: (amount) ->
 					@context.destination.deposit amount
-					@context.source.withdraw amount
+					@context.source.withdraw amount # Also works with "@withdraw amount"
 
 			destination:
 				deposit: (amount) -> 
@@ -116,3 +116,48 @@ describe "Ivento.Dci.Context", ->
 
 			expect(src.balance()).toEqual(900)
 			expect(dest.balance()).toEqual(200)
+
+	describe "Unbinding behavior", ->
+		
+		man = null
+
+		beforeEach ->
+			man = 
+				name: "Clark Kent"
+				useXRay: () -> "Prevented by glasses."
+
+		class SpiderMan extends Ivento.Dci.Context
+			constructor: (man) ->
+				# No bindings, so no unbind is added to Context object.
+
+			spiderman:
+				useWeb: () -> "fzzzt!"
+
+		class SuperMan extends Ivento.Dci.Context
+			constructor: (man) ->
+				@bind(man).to(@superman)
+
+			superman:
+				useXRay: () -> "wzzzt!"
+				fly: () -> "wheee!"
+
+			execute: () -> @superman.fly()
+
+		it "should have an unbind method added after the first bind", ->
+			spider = new SpiderMan man
+			expect(spider.unbind).toBeUndefined()
+
+			superMan = new SuperMan man
+			expect(superMan.unbind).toBeDefined()
+
+		it "unbind() should remove the role methods from the rolePlayer", ->
+			superMan = new SuperMan man
+
+			expect(man.useXRay()).toEqual("wzzzt!")
+			expect(man.fly()).toEqual("wheee!")
+
+			superMan.unbind()
+
+			expect(man.fly).toBeUndefined()
+			expect(man.useXRay()).toEqual("Prevented by glasses.")
+			expect(superMan.unbind).toBeUndefined()

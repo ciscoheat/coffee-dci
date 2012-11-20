@@ -71,19 +71,19 @@
     })();
     ctx = null;
     entries = null;
+    beforeEach(function() {
+      entries = [
+        {
+          message: "Start",
+          amount: 100
+        }, {
+          message: "First deposit",
+          amount: 1000
+        }
+      ];
+      return ctx = new Account(entries);
+    });
     describe("Binding behaviour", function() {
-      beforeEach(function() {
-        entries = [
-          {
-            message: "Start",
-            amount: 100
-          }, {
-            message: "First deposit",
-            amount: 1000
-          }
-        ];
-        return ctx = new Account(entries);
-      });
       it("should bind objects to roles using the bind() method", function() {
         expect(ctx.ledgers.entries).toBe(entries);
         return expect(ctx.ledgers.getBalance()).toEqual(1100);
@@ -103,7 +103,7 @@
         return expect(simple.balance()).toEqual(1100);
       });
     });
-    return describe("MoneyTransfer Context", function() {
+    describe("MoneyTransfer Context", function() {
       var MoneyTransfer;
       MoneyTransfer = (function(_super) {
 
@@ -151,6 +151,74 @@
         context.transfer();
         expect(src.balance()).toEqual(900);
         return expect(dest.balance()).toEqual(200);
+      });
+    });
+    return describe("Unbinding behavior", function() {
+      var SpiderMan, SuperMan, man;
+      man = null;
+      beforeEach(function() {
+        return man = {
+          name: "Clark Kent",
+          useXRay: function() {
+            return "Prevented by glasses.";
+          }
+        };
+      });
+      SpiderMan = (function(_super) {
+
+        __extends(SpiderMan, _super);
+
+        function SpiderMan(man) {}
+
+        SpiderMan.prototype.spiderman = {
+          useWeb: function() {
+            return "fzzzt!";
+          }
+        };
+
+        return SpiderMan;
+
+      })(Ivento.Dci.Context);
+      SuperMan = (function(_super) {
+
+        __extends(SuperMan, _super);
+
+        function SuperMan(man) {
+          this.bind(man).to(this.superman);
+        }
+
+        SuperMan.prototype.superman = {
+          useXRay: function() {
+            return "wzzzt!";
+          },
+          fly: function() {
+            return "wheee!";
+          }
+        };
+
+        SuperMan.prototype.execute = function() {
+          return this.superman.fly();
+        };
+
+        return SuperMan;
+
+      })(Ivento.Dci.Context);
+      it("should have an unbind method added after the first bind", function() {
+        var spider, superMan;
+        spider = new SpiderMan(man);
+        expect(spider.unbind).toBeUndefined();
+        superMan = new SuperMan(man);
+        return expect(superMan.unbind).toBeDefined();
+      });
+      return it("unbind() should remove the role methods from the rolePlayer", function() {
+        var superMan;
+        superMan = new SuperMan(man);
+        expect(man.useXRay()).toEqual("wzzzt!");
+        expect(man.fly()).toEqual("wheee!");
+        superMan.unbind();
+        expect(man.fly).toBeUndefined();
+        expect(man.useXRay()).toEqual("Prevented by glasses.");
+        return expect(superMan.unbind).toBeUndefined();
       });
     });
   });
