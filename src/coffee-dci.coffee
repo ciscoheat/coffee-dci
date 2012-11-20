@@ -5,14 +5,12 @@ top.Ivento.Dci or= {}
 
 # Context class
 top.Ivento.Dci.Context = class Context
-	#@paramNames: (func) ->
-	#	params = /\(([\s\S]*?)\)/.exec func
-	#	param.trim() for param in params[1].split(',') if params
+
+	bind: (rolePlayer) ->
+		Context.bind @, rolePlayer
 
 	# rolePlayer: Object passed to Context in constructor
-	bind: (rolePlayer) ->
-		
-		context = this
+	@bind: (context, rolePlayer) ->
 		cacheName = "__methodCache"
 		# role: Role object in Context
 		to: (role) ->
@@ -45,7 +43,6 @@ top.Ivento.Dci.Context = class Context
 
 				context[roleName] = context.prototype[roleName]
 
-			# context.ledgers = rolePlayer
 			for prop, field of context
 				if field is role
 					roleName = prop

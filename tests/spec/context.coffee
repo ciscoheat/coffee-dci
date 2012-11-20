@@ -1,11 +1,5 @@
 describe "Ivento.Dci.Context", ->
 
-	describe "Static methods", ->
-
-		xit "should return the parameter names correctly from a function", ->
-			f = (a, bb, ccc, dddd) -> true
-			expect(Ivento.Dci.Context.paramNames f).toEqual(["a", "bb", "ccc", "dddd"])
-	
 	class Account extends Ivento.Dci.Context
 		constructor: (entriesArray) ->
 			@bind(entries: entriesArray).to(@ledgers)
@@ -23,6 +17,16 @@ describe "Ivento.Dci.Context", ->
 
 		decreaseBalance: (amount) ->
 			@ledgers.addEntry "Withdrawing", -amount
+
+	class SimplerAccount
+		constructor: (entriesArray) ->
+			Ivento.Dci.Context.bind(@, entries: entriesArray).to(@ledgers)
+
+		ledgers:
+			getBalance: () ->
+				@entries.reduce ((prev, curr) -> prev + curr.amount), 0
+		
+		balance: () -> @ledgers.getBalance()
 
 	ctx = null
 	entries = null
@@ -51,3 +55,7 @@ describe "Ivento.Dci.Context", ->
 
 			ctx.decreaseBalance 1500
 			expect(ctx.balance()).toEqual(-200)
+
+		it "should bind to objects not using inheritance with the static method.", ->
+			simple = new SimplerAccount entries
+			expect(simple.balance()).toEqual(1100)

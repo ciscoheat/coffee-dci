@@ -12,8 +12,11 @@
     function Context() {}
 
     Context.prototype.bind = function(rolePlayer) {
-      var cacheName, context;
-      context = this;
+      return Context.bind(this, rolePlayer);
+    };
+
+    Context.bind = function(context, rolePlayer) {
+      var cacheName;
       cacheName = "__methodCache";
       return {
         to: function(role) {
