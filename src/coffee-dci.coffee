@@ -23,6 +23,12 @@ top.Ivento.Dci.Context = class Context
 			unbind = null
 			roleName = null
 
+			# Test if RolePlayer fulfills Role Contract
+			if role._contract?
+				for prop in role._contract
+					if not (prop of rolePlayer)
+						throw "RolePlayer "+rolePlayer+" didn't fulfill Role Contract with property '"+prop+"'."
+
 			applyRoleMethod = (name) ->
 				-> role[name].apply rolePlayer, arguments
 

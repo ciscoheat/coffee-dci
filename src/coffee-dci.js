@@ -30,10 +30,19 @@
       (_base1 = context.__contextCache)[rolePlayer] || (_base1[rolePlayer] = {});
       return {
         to: function(role) {
-          var applyRoleMethod, assignRoleMethod, cache, field, prop, roleName, unbind;
+          var applyRoleMethod, assignRoleMethod, cache, field, prop, roleName, unbind, _i, _len, _ref;
           cache = null;
           unbind = null;
           roleName = null;
+          if (role._contract != null) {
+            _ref = role._contract;
+            for (_i = 0, _len = _ref.length; _i < _len; _i++) {
+              prop = _ref[_i];
+              if (!(prop in rolePlayer)) {
+                throw "RolePlayer " + rolePlayer + " didn't fulfill Role Contract with property '" + prop + "'.";
+              }
+            }
+          }
           applyRoleMethod = function(name) {
             return function() {
               return role[name].apply(rolePlayer, arguments);

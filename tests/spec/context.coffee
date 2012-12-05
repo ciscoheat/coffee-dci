@@ -120,6 +120,43 @@ describe "Ivento.Dci.Context", ->
 			expect(src.balance()).toEqual(900)
 			expect(dest.balance()).toEqual(200)
 
+	describe "Role Contracts", ->
+
+		class Restaurant extends Ivento.Dci.Context
+			constructor: (guests, waiter) ->
+				@bind(guests).to(@guests)
+				@bind(waiter).to(@waiter)
+
+			waiter:
+				_contract: ['name']
+
+				greetGuests: () ->
+					"Welcome, my name is " + @name + ", I'll be your waiter tonight."
+
+			guests:
+				_contract: ['add', 'remove']
+
+		it "should ensure that the RolePlayer has all contract properties in the _contract array", ->
+			person =
+				name: "Henry"
+
+			guests = []
+			guests.add = guests.push
+			guests.remove = (g) -> delete @[g]
+
+			context = new Restaurant guests, person
+			expect(context.waiter.greetGuests()).toEqual "Welcome, my name is Henry, I'll be your waiter tonight."
+			expect(context.guests.add "Someone").toEqual 1
+
+		it "should throw an Exception if the RolePlayer doesn't have all the properties in the _contract array", ->
+			anonymous = {}
+
+			guests = []
+			guests.add = guests.push
+			guests.remove = (g) -> delete @[g]
+
+			expect(() -> new Restaurant guests, anonymous).toThrow "RolePlayer [object Object] didn't fulfill Role Contract with property 'name'."
+
 	describe "Unbinding behavior", ->
 		
 		man = null

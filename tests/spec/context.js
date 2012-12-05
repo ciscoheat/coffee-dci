@@ -160,6 +160,58 @@
         return expect(dest.balance()).toEqual(200);
       });
     });
+    describe("Role Contracts", function() {
+      var Restaurant;
+      Restaurant = (function(_super) {
+
+        __extends(Restaurant, _super);
+
+        function Restaurant(guests, waiter) {
+          this.bind(guests).to(this.guests);
+          this.bind(waiter).to(this.waiter);
+        }
+
+        Restaurant.prototype.waiter = {
+          _contract: ['name'],
+          greetGuests: function() {
+            return "Welcome, my name is " + this.name + ", I'll be your waiter tonight.";
+          }
+        };
+
+        Restaurant.prototype.guests = {
+          _contract: ['add', 'remove']
+        };
+
+        return Restaurant;
+
+      })(Ivento.Dci.Context);
+      it("should ensure that the RolePlayer has all contract properties in the _contract array", function() {
+        var context, guests, person;
+        person = {
+          name: "Henry"
+        };
+        guests = [];
+        guests.add = guests.push;
+        guests.remove = function(g) {
+          return delete this[g];
+        };
+        context = new Restaurant(guests, person);
+        expect(context.waiter.greetGuests()).toEqual("Welcome, my name is Henry, I'll be your waiter tonight.");
+        return expect(context.guests.add("Someone")).toEqual(1);
+      });
+      return it("should throw an Exception if the RolePlayer doesn't have all the properties in the _contract array", function() {
+        var anonymous, guests;
+        anonymous = {};
+        guests = [];
+        guests.add = guests.push;
+        guests.remove = function(g) {
+          return delete this[g];
+        };
+        return expect(function() {
+          return new Restaurant(guests, anonymous);
+        }).toThrow("RolePlayer [object Object] didn't fulfill Role Contract with property 'name'.");
+      });
+    });
     return describe("Unbinding behavior", function() {
       var SpiderMan, SuperMan, man, superMan;
       man = null;
