@@ -39,15 +39,7 @@ top.Ivento.Dci.Context = class Context
 			# ===== Private methods			
 
 			cacheFor = (prop) ->
-				if not contextCache[rolePlayerCacheId]?
-					if console?.log?
-						console.log "Object not found in context cache:"
-						console.log rolePlayer
-						console.log "Cache:"
-						console.log contextCache
-						console.log "=========="
-					throw "Object for " + rolePlayer + " not found in context cache."
-
+				throw "Object for " + rolePlayer + " not found in context cache." if not contextCache[rolePlayerCacheId]?
 				contextCache[rolePlayerCacheId][prop]
 
 			setCacheFor = (prop, value) ->

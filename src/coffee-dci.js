@@ -50,13 +50,6 @@
           }
           cacheFor = function(prop) {
             if (!(contextCache[rolePlayerCacheId] != null)) {
-              if ((typeof console !== "undefined" && console !== null ? console.log : void 0) != null) {
-                console.log("Object not found in context cache:");
-                console.log(rolePlayer);
-                console.log("Cache:");
-                console.log(contextCache);
-                console.log("==========");
-              }
               throw "Object for " + rolePlayer + " not found in context cache.";
             }
             return contextCache[rolePlayerCacheId][prop];
