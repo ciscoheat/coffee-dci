@@ -62,11 +62,18 @@ describe "Ivento.Dci.Context", ->
 			expect(ctx.balance()).toEqual(ctx.ledgers.getBalance())
 
 		it "should modify the rolePlayers correctly", ->
+			expect(ctx.ledgers).toBe(entries)
+			expect(ctx.ledgers.length).toBe(2)
+
 			ctx.increaseBalance 200
-			expect(ctx.balance()).toEqual(1300)
+			
+			expect(ctx.ledgers).toBe(entries)
+			expect(ctx.ledgers.length).toBe(3)
 			expect(ctx.ledgers[2]).toEqual(message: "Depositing", amount: 200)
+			expect(ctx.balance()).toEqual(1300)
 
 			ctx.decreaseBalance 1500
+			
 			expect(ctx.balance()).toEqual(-200)
 			expect(ctx.ledgers[3]).toEqual(message: "Withdrawing", amount: -1500)
 
@@ -157,6 +164,75 @@ describe "Ivento.Dci.Context", ->
 
 			expect(() -> new Restaurant guests, anonymous).toThrow "RolePlayer [object Object] didn't fulfill Role Contract with property 'name'."
 
+	describe "Role method accessing behavior for name conflicts", ->
+
+		class Game extends Ivento.Dci.Context
+			constructor: (player) ->
+				@bind(player).to(@player)
+
+			player:
+				_contract: ['bar']
+
+				foo: () -> 
+					"Role method foo"
+					
+			play: () ->
+				@player.bar()
+
+			playFoo: () ->
+				@player.foo()
+
+		class LogAccount extends Ivento.Dci.Context
+			constructor: (account) ->
+				@bind(account).to(@account)
+
+			account:
+				_contract: ['amount', 'save', 'write']
+
+				transfer: () ->
+					@save()
+					@write()
+
+				write: () ->
+					@logWritten = true
+
+			transfer: () ->
+				@account.transfer()
+
+		class DbAccount
+			constructor: (@amount) ->
+				
+			save: () =>
+				@write() if @validate()
+
+			validate: () =>
+				@amount > 0
+
+			write: () =>
+				@dbWritten = true
+
+		it "should call the instance method of object.foo even if the object has a role.foo method defined, if called outside the context", ->
+
+			person =
+				foo: () -> "Object method foo"
+				bar: () -> @foo()
+
+			game = new Game person
+			expect(game.play()).toEqual("Object method foo")
+			expect(game.playFoo()).toEqual("Role method foo")
+
+		it "should call the role method role.foo even if the object has a object.foo defined, if called inside the context", ->
+			dbAccount = new DbAccount 123
+			logAccount = new LogAccount dbAccount
+
+			expect(dbAccount.logWritten).toBeFalsy()
+			expect(dbAccount.dbWritten).toBeFalsy()
+
+			logAccount.transfer()
+
+			expect(dbAccount.logWritten).toBeTruthy()
+			expect(dbAccount.dbWritten).toBeTruthy()
+
 	describe "Unbinding behavior", ->
 		
 		man = null
@@ -191,6 +267,9 @@ describe "Ivento.Dci.Context", ->
 				expect(@).toBe(superMan)
 				@superman.fly()
 
+			xRay: () -> 
+				@superman.useXRay()
+
 		it "should have an unbind method added after the first bind", ->
 			spider = new SpiderMan man
 			expect(spider.unbind).toBeUndefined()
@@ -198,18 +277,19 @@ describe "Ivento.Dci.Context", ->
 			superMan = new SuperMan man
 			expect(superMan.unbind).toBeDefined()
 
-		it "unbind() should remove the role methods from the rolePlayer", ->
+		it "should remove the role methods from the rolePlayer when calling unbind", ->
 			superMan = new SuperMan man
 
-			expect(man.useXRay()).toEqual("wzzzt!")
+			# Cannot use xRay outside context.
+			expect(man.useXRay()).toEqual("Prevented by glasses.")
 			expect(man.fly()).toEqual("wheee!")
 
 			expect(superMan.superman.name).toBeDefined()
+			expect(superMan.xRay()).toEqual("wzzzt!")
 
 			superMan.unbind()
 
 			expect(man.fly).toBeUndefined()
-			expect(man.useXRay()).toEqual("Prevented by glasses.")
-			
+						
 			expect(superMan.unbind).toBeUndefined()
 			expect(superMan.superman.name).toBeUndefined()
