@@ -37,16 +37,18 @@
       contextCache = context.__contextCache;
       return {
         to: function(role) {
-          var applyRoleMethod, assignRoleMethod, cacheFor, contextIsBound, decorateContextMethods, field, isValidContextProperty, prop, roleMethod, setCacheFor, _i, _len, _ref;
-          roleMethod = null;
-          if (role._contract != null) {
-            _ref = role._contract;
-            for (_i = 0, _len = _ref.length; _i < _len; _i++) {
-              prop = _ref[_i];
-              if (!(prop in rolePlayer)) {
-                throw "RolePlayer " + rolePlayer + " didn't fulfill Role Contract with property '" + prop + "'.";
-              }
+          var applyRoleMethod, assignRoleMethod, cacheFor, contextIsBound, contextRole, decorateContextMethods, field, isValidContextProperty, prop, roleProperty, setCacheFor, _i, _len, _ref;
+          roleProperty = null;
+          for (prop in context) {
+            field = context[prop];
+            if (field === role) {
+              roleProperty = prop;
+              context[prop] = rolePlayer;
+              break;
             }
+          }
+          if (!roleProperty) {
+            throw "Role for RolePlayer not found in Context.";
           }
           cacheFor = function(prop) {
             if (!(contextCache[rolePlayerCacheId] != null)) {
@@ -63,16 +65,19 @@
           contextIsBound = function() {
             return context.unbind != null;
           };
-          decorateContextMethods = function(obj) {
-            var field, _results;
+          contextRole = function() {
+            return context.constructor.prototype[roleProperty];
+          };
+          decorateContextMethods = function(obj, roleMethods) {
+            var _results;
             _results = [];
             for (prop in obj) {
               field = obj[prop];
               if (isValidContextProperty(obj, prop)) {
-                if (Context.isFunction(field)) {
-                  _results.push(field.__contextMethod = true);
-                } else if (Context.isObject(field)) {
-                  _results.push(decorateContextMethods(field));
+                if (!field.__contextMethod && Context.isFunction(field)) {
+                  _results.push(field.__contextMethod = roleMethods ? roleProperty : true);
+                } else if (prop === roleProperty) {
+                  _results.push(decorateContextMethods(field, true));
                 } else {
                   _results.push(void 0);
                 }
@@ -82,10 +87,10 @@
           };
           applyRoleMethod = function(prop) {
             return function() {
-              var callingMethod, method, objectMethod;
+              var contextCaller, method, objectMethod;
               objectMethod = cacheFor(prop);
-              callingMethod = arguments.callee.caller;
-              if (!objectMethod || (callingMethod.__contextMethod != null)) {
+              contextCaller = arguments.callee.caller.__contextMethod;
+              if (!objectMethod || contextCaller === true || contextCaller === roleProperty) {
                 method = role[prop];
               } else {
                 method = objectMethod;
@@ -102,9 +107,16 @@
             setCacheFor(prop, cache);
             return rolePlayer[prop] = value != null ? value : applyRoleMethod(prop);
           };
-          if (!contextIsBound()) {
-            decorateContextMethods(context.constructor.prototype);
+          if (role._contract != null) {
+            _ref = role._contract;
+            for (_i = 0, _len = _ref.length; _i < _len; _i++) {
+              prop = _ref[_i];
+              if (!(prop in rolePlayer)) {
+                throw "RolePlayer " + rolePlayer + " didn't fulfill Role Contract with property '" + prop + "'.";
+              }
+            }
           }
+          decorateContextMethods(context.constructor.prototype, false);
           for (prop in role) {
             field = role[prop];
             if (isValidContextProperty(role, prop)) {
@@ -113,7 +125,7 @@
           }
           assignRoleMethod(contextProperty, context);
           if (!contextIsBound()) {
-            context.unbind = function() {
+            return context.unbind = function() {
               var cache, id;
               for (id in contextCache) {
                 for (prop in contextCache[id]) {
@@ -125,19 +137,10 @@
                   }
                 }
               }
-              context[roleMethod] = context.constructor.prototype[roleMethod];
+              context[roleProperty] = context.constructor.prototype[roleProperty];
               return delete context.unbind;
             };
           }
-          for (prop in context) {
-            field = context[prop];
-            if (field === role) {
-              roleMethod = prop;
-              context[prop] = rolePlayer;
-              return;
-            }
-          }
-          throw "Role for RolePlayer not found in Context.";
         }
       };
     };

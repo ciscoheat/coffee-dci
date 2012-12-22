@@ -225,6 +225,7 @@
 
         function Game(player) {
           this.bind(player).to(this.player);
+          this.bind(player).to(this.judge);
         }
 
         Game.prototype.player = {
@@ -234,12 +235,23 @@
           }
         };
 
+        Game.prototype.judge = {
+          _contract: ['foo'],
+          judgeGame: function() {
+            return "Judge: " + this.foo();
+          }
+        };
+
         Game.prototype.play = function() {
           return this.player.bar();
         };
 
         Game.prototype.playFoo = function() {
           return this.player.foo();
+        };
+
+        Game.prototype.judgeGame = function() {
+          return this.judge.judgeGame();
         };
 
         return Game;
@@ -312,7 +324,8 @@
         };
         game = new Game(person);
         expect(game.play()).toEqual("Object method foo");
-        return expect(game.playFoo()).toEqual("Role method foo");
+        expect(game.playFoo()).toEqual("Role method foo");
+        return expect(game.judgeGame()).toEqual("Judge: Object method foo");
       });
       return it("should call the role method role.foo even if the object has a object.foo defined, if called inside the context", function() {
         var dbAccount, logAccount;

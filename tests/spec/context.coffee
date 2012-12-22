@@ -169,18 +169,28 @@ describe "Ivento.Dci.Context", ->
 		class Game extends Ivento.Dci.Context
 			constructor: (player) ->
 				@bind(player).to(@player)
+				@bind(player).to(@judge)
 
 			player:
 				_contract: ['bar']
 
 				foo: () -> 
 					"Role method foo"
+
+			judge:
+				_contract: ['foo']
+
+				judgeGame: () ->
+					"Judge: " + @foo()
 					
 			play: () ->
 				@player.bar()
 
 			playFoo: () ->
 				@player.foo()
+
+			judgeGame: () ->
+				@judge.judgeGame()
 
 		class LogAccount extends Ivento.Dci.Context
 			constructor: (account) ->
@@ -220,6 +230,7 @@ describe "Ivento.Dci.Context", ->
 			game = new Game person
 			expect(game.play()).toEqual("Object method foo")
 			expect(game.playFoo()).toEqual("Role method foo")
+			expect(game.judgeGame()).toEqual("Judge: Object method foo")
 
 		it "should call the role method role.foo even if the object has a object.foo defined, if called inside the context", ->
 			dbAccount = new DbAccount 123

@@ -28,13 +28,16 @@ top.Ivento.Dci.Context = class Context
 
 		# role: Role object in Context
 		to: (role) ->
-			roleMethod = null			
 
-			# Test if RolePlayer fulfills Role Contract
-			if role._contract?
-				for prop in role._contract
-					if not (prop of rolePlayer)
-						throw "RolePlayer "+rolePlayer+" didn't fulfill Role Contract with property '"+prop+"'."
+			roleProperty = null			
+
+			for prop, field of context
+				if field is role
+					roleProperty = prop
+					context[prop] = rolePlayer
+					break
+
+			throw "Role for RolePlayer not found in Context." if not roleProperty
 
 			# ===== Private methods			
 
@@ -50,20 +53,24 @@ top.Ivento.Dci.Context = class Context
 
 			contextIsBound = () -> context.unbind?
 
-			decorateContextMethods = (obj) ->
+			contextRole = () ->
+				context.constructor.prototype[roleProperty]
+
+			decorateContextMethods = (obj, roleMethods) ->
 				for prop, field of obj when isValidContextProperty obj, prop
-					if Context.isFunction field
-						field.__contextMethod = true 
-					else if Context.isObject field
-						decorateContextMethods field
+					if not field.__contextMethod and Context.isFunction field
+						field.__contextMethod = if roleMethods then roleProperty else true
+					else if prop is roleProperty
+						decorateContextMethods field, true
 
 			applyRoleMethod = (prop) ->
 				->
 					objectMethod = cacheFor prop
-					callingMethod = arguments.callee.caller
+					contextCaller = arguments.callee.caller.__contextMethod
 
-					# objectMethod can be 'false' so cannot test using existence
-					if not objectMethod or callingMethod.__contextMethod?
+					# objectMethod can be false so cannot test using existence.
+					# if contextCall is true, the role method is called from a context method (interaction)
+					if not objectMethod or contextCaller is true or contextCaller is roleProperty
 						method = role[prop]
 					else
 						method = objectMethod
@@ -80,7 +87,13 @@ top.Ivento.Dci.Context = class Context
 
 			# ===== End private methods
 
-			decorateContextMethods context.constructor.prototype if not contextIsBound()
+			# Test if RolePlayer fulfills Role Contract
+			if role._contract?
+				for prop in role._contract
+					if not (prop of rolePlayer)
+						throw "RolePlayer "+rolePlayer+" didn't fulfill Role Contract with property '"+prop+"'."
+
+			decorateContextMethods context.constructor.prototype, false
 
 			assignRoleMethod prop for prop, field of role when isValidContextProperty role, prop
 
@@ -96,14 +109,6 @@ top.Ivento.Dci.Context = class Context
 							if cache then rolePlayer[prop] = cache else delete rolePlayer[prop]
 				
 					# Restore original context role
-					context[roleMethod] = context.constructor.prototype[roleMethod]
+					context[roleProperty] = context.constructor.prototype[roleProperty]
 					delete context.unbind
-
-			# Assign roleplayer to role in context.
-			for prop, field of context
-				if field is role
-					roleMethod = prop
-					context[prop] = rolePlayer
-					return
-
-			throw "Role for RolePlayer not found in Context."
+						
