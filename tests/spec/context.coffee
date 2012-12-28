@@ -3,17 +3,24 @@ describe "Ivento.Dci.Context", ->
 	class Account extends Ivento.Dci.Context
 		constructor: (entries = []) ->
 			@bind(entries).to(@ledgers)
+			@bind(entries).to(@balancer)
 
 		# ===== Roles =====
 
+		balancer:
+			_contract: ['reduce']
+
+			getBalance: () ->
+				@reduce ((prev, curr) -> prev + curr.amount), 0
+
 		ledgers:
-			_contract: ['push', 'reduce']
+			_contract: ['push']
 
 			addEntry: (message, amount) ->
 				@push message: message, amount: amount
 
 			getBalance: () ->
-				@reduce ((prev, curr) -> prev + curr.amount), 0
+				@context.balancer.getBalance()
 		
 		# ===== End roles =====
 
@@ -124,10 +131,7 @@ describe "Ivento.Dci.Context", ->
 		it "should transfer money using Accounts", ->
 			
 			src = new Account entries
-			src.name = "src"
-
 			dest = new Account
-			dest.name = "dest"
 
 			expect(src.balance()).toEqual(1100)
 			expect(dest.balance()).toEqual(0)
@@ -322,12 +326,13 @@ describe "Ivento.Dci.Context", ->
 			xRay: () -> 
 				@superman.useXRay()
 
-		it "should remove the role methods from the rolePlayer when calling unbind", ->
+		it "should prevent access to Roles outside the Context.", ->
 			superMan = new SuperMan man
 
 			# Cannot use xRay outside context.
 			expect(man.useXRay()).toEqual("Prevented by glasses.")
 			expect(man.fly).toBeUndefined()
 			expect(superMan.xRay()).toEqual("wzzzt!")
-			expect(-> superMan.superman.fly()).toThrow "Access to Role 'superman.fly' from outside Context."
+			# Does not work with Iced Coffeescript:
+			#expect(-> superMan.superman.fly()).toThrow "Access to Role 'superman.fly' from outside Context."
 			expect(superMan.superman.name).toBeUndefined()

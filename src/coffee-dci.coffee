@@ -19,12 +19,7 @@ top.Ivento.Dci.Context = class Context
 
 		createContextMethod = (prop) ->
 			->
-				prevContext = Context.__current
-				Context.__current = context
-				try
-					context.constructor.prototype[prop].apply context, arguments
-				finally
-					Context.__current = prevContext
+				context.constructor.prototype[prop].apply context, arguments
 
 		# Bind context methods to current context
 		if not context.__methodBound?
@@ -61,38 +56,31 @@ top.Ivento.Dci.Context = class Context
 
 			createRoleMethod = (prop, roleMethod, objectMethod) ->
 				->
-					oldContext = rolePlayer[contextProperty]
-					rolePlayer[contextProperty] = Context.__current
+					# Only one context is active at a time, so this reassignment is ok.
+					rolePlayer[contextProperty] = context
 
 					caller = arguments.callee.caller.__contextMethod
 					calledFromContext = caller is true or caller is roleProp
 
-					try
-						# If only Role Method is available, call it.
-						if roleMethod? and not objectMethod?
-							# Does not work with Iced Coffeescript:
-							#throw "Access to Role '" + roleProp + "." + prop + "' from outside Context." if not caller
-							return context.constructor.prototype[roleProp][prop].apply rolePlayer, arguments
+					# If only Role Method is available, call it.
+					if roleMethod? and not objectMethod?
+						# Does not work with Iced Coffeescript:
+						#throw "Access to Role '" + roleProp + "." + prop + "' from outside Context." if not caller
+						return context.constructor.prototype[roleProp][prop].apply rolePlayer, arguments
 
-						# If only Object Method is available, call it.
-						if objectMethod? and not roleMethod?
+					# If only Object Method is available, call it.
+					if objectMethod? and not roleMethod?
+						return objectMethod.apply rolePlayer, arguments
+
+					# If both Role and Object Method is available, determine if method was called
+					# from a Context, and call Role Method if so, Object Method otherwise.
+					if roleMethod and objectMethod
+						if calledFromContext
+							return context.constructor.prototype[roleProp][prop].apply rolePlayer, arguments
+						else
 							return objectMethod.apply rolePlayer, arguments
 
-						# If both Role and Object Method is available, determine if method was called
-						# from a Context, and call Role Method if so, Object Method otherwise.
-						if roleMethod and objectMethod
-							if calledFromContext
-								return context.constructor.prototype[roleProp][prop].apply rolePlayer, arguments
-							else
-								return objectMethod.apply rolePlayer, arguments
-
-						throw "No Role Method or Object Method '" + prop + "' found."
-
-					finally
-						if oldContext?
-							rolePlayer[contextProperty] = oldContext
-						else
-							delete rolePlayer[contextProperty]
+					throw "No Role Method or Object Method '" + prop + "' found."
 
 			# Bind role methods
 			rolePlayerType = typeof rolePlayer

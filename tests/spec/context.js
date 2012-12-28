@@ -14,10 +14,20 @@
           entries = [];
         }
         this.bind(entries).to(this.ledgers);
+        this.bind(entries).to(this.balancer);
       }
 
+      Account.prototype.balancer = {
+        _contract: ['reduce'],
+        getBalance: function() {
+          return this.reduce((function(prev, curr) {
+            return prev + curr.amount;
+          }), 0);
+        }
+      };
+
       Account.prototype.ledgers = {
-        _contract: ['push', 'reduce'],
+        _contract: ['push'],
         addEntry: function(message, amount) {
           return this.push({
             message: message,
@@ -25,9 +35,7 @@
           });
         },
         getBalance: function() {
-          return this.reduce((function(prev, curr) {
-            return prev + curr.amount;
-          }), 0);
+          return this.context.balancer.getBalance();
         }
       };
 
@@ -159,9 +167,7 @@
       return it("should transfer money using Accounts", function() {
         var context, dest, src;
         src = new Account(entries);
-        src.name = "src";
         dest = new Account;
-        dest.name = "dest";
         expect(src.balance()).toEqual(1100);
         expect(dest.balance()).toEqual(0);
         context = new MoneyTransfer(src, dest, 200);
@@ -446,14 +452,11 @@
         return SuperMan;
 
       })(Ivento.Dci.Context);
-      return it("should remove the role methods from the rolePlayer when calling unbind", function() {
+      return it("should prevent access to Roles outside the Context.", function() {
         superMan = new SuperMan(man);
         expect(man.useXRay()).toEqual("Prevented by glasses.");
         expect(man.fly).toBeUndefined();
         expect(superMan.xRay()).toEqual("wzzzt!");
-        expect(function() {
-          return superMan.superman.fly();
-        }).toThrow("Access to Role 'superman.fly' from outside Context.");
         return expect(superMan.superman.name).toBeUndefined();
       });
     });

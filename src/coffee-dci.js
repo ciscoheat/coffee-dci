@@ -34,14 +34,7 @@
       };
       createContextMethod = function(prop) {
         return function() {
-          var prevContext;
-          prevContext = Context.__current;
-          Context.__current = context;
-          try {
-            return context.constructor.prototype[prop].apply(context, arguments);
-          } finally {
-            Context.__current = prevContext;
-          }
+          return context.constructor.prototype[prop].apply(context, arguments);
         };
       };
       if (!(context.__methodBound != null)) {
@@ -109,33 +102,24 @@
           };
           createRoleMethod = function(prop, roleMethod, objectMethod) {
             return function() {
-              var calledFromContext, caller, oldContext;
-              oldContext = rolePlayer[contextProperty];
-              rolePlayer[contextProperty] = Context.__current;
+              var calledFromContext, caller;
+              rolePlayer[contextProperty] = context;
               caller = arguments.callee.caller.__contextMethod;
               calledFromContext = caller === true || caller === roleProp;
-              try {
-                if ((roleMethod != null) && !(objectMethod != null)) {
+              if ((roleMethod != null) && !(objectMethod != null)) {
+                return context.constructor.prototype[roleProp][prop].apply(rolePlayer, arguments);
+              }
+              if ((objectMethod != null) && !(roleMethod != null)) {
+                return objectMethod.apply(rolePlayer, arguments);
+              }
+              if (roleMethod && objectMethod) {
+                if (calledFromContext) {
                   return context.constructor.prototype[roleProp][prop].apply(rolePlayer, arguments);
-                }
-                if ((objectMethod != null) && !(roleMethod != null)) {
+                } else {
                   return objectMethod.apply(rolePlayer, arguments);
                 }
-                if (roleMethod && objectMethod) {
-                  if (calledFromContext) {
-                    return context.constructor.prototype[roleProp][prop].apply(rolePlayer, arguments);
-                  } else {
-                    return objectMethod.apply(rolePlayer, arguments);
-                  }
-                }
-                throw "No Role Method or Object Method '" + prop + "' found.";
-              } finally {
-                if (oldContext != null) {
-                  rolePlayer[contextProperty] = oldContext;
-                } else {
-                  delete rolePlayer[contextProperty];
-                }
               }
+              throw "No Role Method or Object Method '" + prop + "' found.";
             };
           };
           rolePlayerType = typeof rolePlayer;
