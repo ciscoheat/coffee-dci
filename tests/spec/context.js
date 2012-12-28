@@ -4,7 +4,7 @@
     __bind = function(fn, me){ return function(){ return fn.apply(me, arguments); }; };
 
   describe("Ivento.Dci.Context", function() {
-    var Account, SimplerAccount, ctx, entries;
+    var Account, SimplerAccount, entries;
     Account = (function(_super) {
 
       __extends(Account, _super);
@@ -17,6 +17,7 @@
       }
 
       Account.prototype.ledgers = {
+        _contract: ['push', 'reduce'],
         addEntry: function(message, amount) {
           return this.push({
             message: message,
@@ -54,6 +55,7 @@
       }
 
       SimplerAccount.prototype.ledgers = {
+        _contract: ['entries'],
         getBalance: function() {
           return this.entries.reduce((function(prev, curr) {
             return prev + curr.amount;
@@ -68,7 +70,6 @@
       return SimplerAccount;
 
     })();
-    ctx = null;
     entries = null;
     beforeEach(function() {
       entries = [
@@ -80,30 +81,32 @@
           amount: 1000
         }
       ];
-      return ctx = new Account(entries);
+      return window.entries = entries;
     });
     describe("Binding behaviour", function() {
+      var ctx;
+      ctx = null;
+      beforeEach(function() {
+        return ctx = new Account(entries);
+      });
       it("should bind objects to roles using the bind() method", function() {
-        expect(ctx.ledgers).toBe(entries);
-        return expect(ctx.ledgers.getBalance()).toEqual(1100);
+        return expect(ctx.ledgers).toBeDefined();
       });
       it("should be able to use the context methods", function() {
-        return expect(ctx.balance()).toEqual(ctx.ledgers.getBalance());
+        return expect(ctx.balance()).toEqual(1100);
       });
       it("should modify the rolePlayers correctly", function() {
-        expect(ctx.ledgers).toBe(entries);
-        expect(ctx.ledgers.length).toBe(2);
+        expect(entries.length).toBe(2);
         ctx.increaseBalance(200);
-        expect(ctx.ledgers).toBe(entries);
-        expect(ctx.ledgers.length).toBe(3);
-        expect(ctx.ledgers[2]).toEqual({
+        expect(entries.length).toBe(3);
+        expect(entries[2]).toEqual({
           message: "Depositing",
           amount: 200
         });
         expect(ctx.balance()).toEqual(1300);
         ctx.decreaseBalance(1500);
         expect(ctx.balance()).toEqual(-200);
-        return expect(ctx.ledgers[3]).toEqual({
+        return expect(entries[3]).toEqual({
           message: "Withdrawing",
           amount: -1500
         });
@@ -127,16 +130,18 @@
         }
 
         MoneyTransfer.prototype.source = {
+          _contract: ['decreaseBalance'],
           withdraw: function(amount) {
             return this.decreaseBalance(amount);
           },
           transfer: function(amount) {
             this.context.destination.deposit(amount);
-            return this.withdraw(amount);
+            return this.context.source.withdraw(amount);
           }
         };
 
         MoneyTransfer.prototype.destination = {
+          _contract: ['increaseBalance'],
           deposit: function(amount) {
             return this.increaseBalance(amount);
           }
@@ -152,15 +157,15 @@
 
       })(Ivento.Dci.Context);
       return it("should transfer money using Accounts", function() {
-        var amount, context, dest, src;
+        var context, dest, src;
         src = new Account(entries);
+        src.name = "src";
         dest = new Account;
-        amount = 200;
+        dest.name = "dest";
         expect(src.balance()).toEqual(1100);
         expect(dest.balance()).toEqual(0);
-        context = new MoneyTransfer(src, dest, amount);
+        context = new MoneyTransfer(src, dest, 200);
         context.transfer();
-        context.unbind();
         expect(src.balance()).toEqual(900);
         return expect(dest.balance()).toEqual(200);
       });
@@ -187,6 +192,14 @@
           _contract: ['add', 'remove']
         };
 
+        Restaurant.prototype.greet = function() {
+          return this.waiter.greetGuests();
+        };
+
+        Restaurant.prototype.addGuest = function(name) {
+          return this.guests.add(name);
+        };
+
         return Restaurant;
 
       })(Ivento.Dci.Context);
@@ -201,8 +214,8 @@
           return delete this[g];
         };
         context = new Restaurant(guests, person);
-        expect(context.waiter.greetGuests()).toEqual("Welcome, my name is Henry, I'll be your waiter tonight.");
-        return expect(context.guests.add("Someone")).toEqual(1);
+        expect(context.greet()).toEqual("Welcome, my name is Henry, I'll be your waiter tonight.");
+        return expect(context.addGuest("Someone")).toEqual(1);
       });
       return it("should throw an Exception if the RolePlayer doesn't have all the properties in the _contract array", function() {
         var anonymous, guests;
@@ -218,45 +231,7 @@
       });
     });
     describe("Role method accessing behavior for name conflicts", function() {
-      var DbAccount, Game, LogAccount;
-      Game = (function(_super) {
-
-        __extends(Game, _super);
-
-        function Game(player) {
-          this.bind(player).to(this.player);
-          this.bind(player).to(this.judge);
-        }
-
-        Game.prototype.player = {
-          _contract: ['bar'],
-          foo: function() {
-            return "Role method foo";
-          }
-        };
-
-        Game.prototype.judge = {
-          _contract: ['foo'],
-          judgeGame: function() {
-            return "Judge: " + this.foo();
-          }
-        };
-
-        Game.prototype.play = function() {
-          return this.player.bar();
-        };
-
-        Game.prototype.playFoo = function() {
-          return this.player.foo();
-        };
-
-        Game.prototype.judgeGame = function() {
-          return this.judge.judgeGame();
-        };
-
-        return Game;
-
-      })(Ivento.Dci.Context);
+      var DbAccount, Game, LogAccount, MultiRoles;
       LogAccount = (function(_super) {
 
         __extends(LogAccount, _super);
@@ -266,7 +241,7 @@
         }
 
         LogAccount.prototype.account = {
-          _contract: ['amount', 'save', 'write'],
+          _contract: ['save', 'write'],
           transfer: function() {
             this.save();
             return this.write();
@@ -312,6 +287,75 @@
         return DbAccount;
 
       })();
+      MultiRoles = (function(_super) {
+
+        __extends(MultiRoles, _super);
+
+        function MultiRoles(object) {
+          if (object == null) {
+            object = {};
+          }
+          this.bind(object).to(this.source);
+          this.bind(object).to(this.target);
+        }
+
+        MultiRoles.prototype.source = {
+          foo: function() {
+            return "source";
+          }
+        };
+
+        MultiRoles.prototype.target = {
+          foo: function() {
+            return "target";
+          }
+        };
+
+        MultiRoles.prototype.doIt = function() {
+          return this.source.foo() + this.target.foo();
+        };
+
+        return MultiRoles;
+
+      })(Ivento.Dci.Context);
+      Game = (function(_super) {
+
+        __extends(Game, _super);
+
+        function Game(player) {
+          this.bind(player).to(this.player);
+          this.bind(player).to(this.judge);
+        }
+
+        Game.prototype.player = {
+          _contract: ['bar'],
+          foo: function() {
+            return "Role method foo";
+          }
+        };
+
+        Game.prototype.judge = {
+          _contract: ['foo'],
+          judgeGame: function() {
+            return "Judge: " + this.foo();
+          }
+        };
+
+        Game.prototype.play = function() {
+          return this.player.bar();
+        };
+
+        Game.prototype.playFoo = function() {
+          return this.player.foo();
+        };
+
+        Game.prototype.judgeGame = function() {
+          return this.judge.judgeGame();
+        };
+
+        return Game;
+
+      })(Ivento.Dci.Context);
       it("should call the instance method of object.foo even if the object has a role.foo method defined, if called outside the context", function() {
         var game, person;
         person = {
@@ -325,9 +369,11 @@
         game = new Game(person);
         expect(game.play()).toEqual("Object method foo");
         expect(game.playFoo()).toEqual("Role method foo");
-        return expect(game.judgeGame()).toEqual("Judge: Object method foo");
+        expect(game.judgeGame()).toEqual("Judge: Object method foo");
+        expect(person.foo()).toEqual("Object method foo");
+        return expect(person.bar()).toEqual("Object method foo");
       });
-      return it("should call the role method role.foo even if the object has a object.foo defined, if called inside the context", function() {
+      it("should call the role method role.foo even if the object has a object.foo defined, if called inside the context", function() {
         var dbAccount, logAccount;
         dbAccount = new DbAccount(123);
         logAccount = new LogAccount(dbAccount);
@@ -336,6 +382,11 @@
         logAccount.transfer();
         expect(dbAccount.logWritten).toBeTruthy();
         return expect(dbAccount.dbWritten).toBeTruthy();
+      });
+      return it("should call methods depending on what role they were called from", function() {
+        var context;
+        context = new MultiRoles;
+        return expect(context.doIt()).toEqual("sourcetarget");
       });
     });
     return describe("Unbinding behavior", function() {
@@ -395,22 +446,14 @@
         return SuperMan;
 
       })(Ivento.Dci.Context);
-      it("should have an unbind method added after the first bind", function() {
-        var spider;
-        spider = new SpiderMan(man);
-        expect(spider.unbind).toBeUndefined();
-        superMan = new SuperMan(man);
-        return expect(superMan.unbind).toBeDefined();
-      });
       return it("should remove the role methods from the rolePlayer when calling unbind", function() {
         superMan = new SuperMan(man);
         expect(man.useXRay()).toEqual("Prevented by glasses.");
-        expect(man.fly()).toEqual("wheee!");
-        expect(superMan.superman.name).toBeDefined();
-        expect(superMan.xRay()).toEqual("wzzzt!");
-        superMan.unbind();
         expect(man.fly).toBeUndefined();
-        expect(superMan.unbind).toBeUndefined();
+        expect(superMan.xRay()).toEqual("wzzzt!");
+        expect(function() {
+          return superMan.superman.fly();
+        }).toThrow("Access to Role 'superman.fly' from outside Context.");
         return expect(superMan.superman.name).toBeUndefined();
       });
     });

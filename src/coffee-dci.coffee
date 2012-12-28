@@ -6,109 +6,105 @@ top.Ivento.Dci or= {}
 # Context class
 top.Ivento.Dci.Context = class Context
 
-	constructor: (@__contextProperty) ->
+	bind: (rolePlayer) -> Context.bind @, rolePlayer
 
-	bind: (rolePlayer) ->
-		Context.bind @, rolePlayer, @.__contextProperty
+	@bind: (context, rolePlayer) ->
 
-	@isFunction: (obj) -> !!(obj && obj.constructor && obj.call && obj.apply)
-	@isObject: (obj) -> obj isnt null and typeof obj is 'object'
+		isFunction = (x) -> !!(x && x.constructor && x.call && x.apply)
+		isObject = (x) -> x isnt null and typeof x is 'object'
 
-	# rolePlayer: Object passed to Context in constructor
-	@bind: (context, rolePlayer, contextProperty = 'context') ->
+		isRoleObject = (field) -> isObject field
+		isContextMethod = (prop) -> prop[0] isnt '_' and prop isnt 'constructor' and isFunction(context[prop])
+		isRoleMethod = (prop, method) -> prop[0] isnt '_' and prop isnt 'constructor' and isFunction(method)
 
-		# Create rolePlayer cache id
-		context.__contextCacheId or= 0
-		rolePlayerCacheId = ++context.__contextCacheId
+		createContextMethod = (prop) ->
+			->
+				prevContext = Context.__current
+				Context.__current = context
+				try
+					context.constructor.prototype[prop].apply context, arguments
+				finally
+					Context.__current = prevContext
 
-		context.__contextCache or= {}
-		context.__contextCache[rolePlayerCacheId] or= {}
+		# Bind context methods to current context
+		if not context.__methodBound?
+			context.__methodBound = true
+			for prop, field of context.constructor.prototype
+				if isContextMethod prop
+					context.constructor.prototype[prop].__contextMethod = true
+					context[prop] = createContextMethod prop
+				else if isRoleObject field
+					for roleName, roleMethod of field when isRoleMethod roleName, roleMethod
+						context.constructor.prototype[prop][roleName].__contextMethod = prop
 
-		contextCache = context.__contextCache
+		to: (role, contextProperty = 'context') ->			
 
-		# role: Role object in Context
-		to: (role) ->
+			roleProp = null
 
-			roleProperty = null			
-
+			# Test if Role exists in Context
 			for prop, field of context
-				if field is role
-					roleProperty = prop
-					context[prop] = rolePlayer
+				if field is role 
+					roleProp = prop
 					break
 
-			throw "Role for RolePlayer not found in Context." if not roleProperty
-
-			# ===== Private methods			
-
-			cacheFor = (prop) ->
-				throw "Object for " + rolePlayer + " not found in context cache." if not contextCache[rolePlayerCacheId]?
-				contextCache[rolePlayerCacheId][prop]
-
-			setCacheFor = (prop, value) ->
-				contextCache[rolePlayerCacheId][prop] = value
-
-			isValidContextProperty = (obj, prop) -> 
-				prop isnt 'constructor' and prop isnt '_contract' and obj.hasOwnProperty prop
-
-			contextIsBound = () -> context.unbind?
-
-			contextRole = () ->
-				context.constructor.prototype[roleProperty]
-
-			decorateContextMethods = (obj, roleMethods) ->
-				for prop, field of obj when isValidContextProperty obj, prop
-					if not field.__contextMethod and Context.isFunction field
-						field.__contextMethod = if roleMethods then roleProperty else true
-					else if prop is roleProperty
-						decorateContextMethods field, true
-
-			applyRoleMethod = (prop) ->
-				->
-					objectMethod = cacheFor prop
-					contextCaller = arguments.callee.caller.__contextMethod
-
-					# objectMethod can be false so cannot test using existence.
-					# if contextCall is true, the role method is called from a context method (interaction)
-					if not objectMethod or contextCaller is true or contextCaller is roleProperty
-						method = role[prop]
-					else
-						method = objectMethod
-
-					method.apply rolePlayer, arguments
-						
-
-			assignRoleMethod = (prop, value = null) ->
-				# This value is used during unbind.
-				# If a property, restore value. If false, delete value.
-				cache = if rolePlayer.hasOwnProperty(prop) then rolePlayer[prop] else false
-				setCacheFor prop, cache
-				rolePlayer[prop] = value ? applyRoleMethod prop
-
-			# ===== End private methods
+			throw "Role for RolePlayer not found in Context." if not roleProp
 
 			# Test if RolePlayer fulfills Role Contract
 			if role._contract?
 				for prop in role._contract
-					if not (prop of rolePlayer)
-						throw "RolePlayer "+rolePlayer+" didn't fulfill Role Contract with property '"+prop+"'."
+					throw "RolePlayer "+rolePlayer+" didn't fulfill Role Contract with property '"+prop+"'." if not (prop of rolePlayer)						
 
-			decorateContextMethods context.constructor.prototype, false
+			roleKeys = () ->
+				keys = (prop for prop, field of context.constructor.prototype[roleProp] when isRoleMethod prop, field)
+				keys = keys.concat role._contract if role._contract?
+				keys
 
-			assignRoleMethod prop for prop, field of role when isValidContextProperty role, prop
+			createRoleMethod = (prop, roleMethod, objectMethod) ->
+				->
+					oldContext = rolePlayer[contextProperty]
+					rolePlayer[contextProperty] = Context.__current
 
-			# Assign context property to role
-			assignRoleMethod contextProperty, context
+					caller = arguments.callee.caller.__contextMethod
+					calledFromContext = caller is true or caller is roleProp
 
-			# Assign unbind method to context
-			if not contextIsBound()
-				context.unbind = ->
-					for id of contextCache
-						for prop of contextCache[id]
-							cache = contextCache[id][prop]
-							if cache then rolePlayer[prop] = cache else delete rolePlayer[prop]
+					try
+						# If only Role Method is available, call it.
+						if roleMethod? and not objectMethod?
+							# Does not work with Iced Coffeescript:
+							#throw "Access to Role '" + roleProp + "." + prop + "' from outside Context." if not caller
+							return context.constructor.prototype[roleProp][prop].apply rolePlayer, arguments
+
+						# If only Object Method is available, call it.
+						if objectMethod? and not roleMethod?
+							return objectMethod.apply rolePlayer, arguments
+
+						# If both Role and Object Method is available, determine if method was called
+						# from a Context, and call Role Method if so, Object Method otherwise.
+						if roleMethod and objectMethod
+							if calledFromContext
+								return context.constructor.prototype[roleProp][prop].apply rolePlayer, arguments
+							else
+								return objectMethod.apply rolePlayer, arguments
+
+						throw "No Role Method or Object Method '" + prop + "' found."
+
+					finally
+						if oldContext?
+							rolePlayer[contextProperty] = oldContext
+						else
+							delete rolePlayer[contextProperty]
+
+			# Bind role methods
+			rolePlayerType = typeof rolePlayer
+			context[roleProp] = if rolePlayerType in ['boolean', 'number', 'string'] then rolePlayer else {}
+
+			# Need to duplicate the role object to preserve the context closure.
+			for prop in roleKeys()
+				roleMethod = context.constructor.prototype[roleProp][prop]
+				objectMethod = rolePlayer[prop]
+
+				context[roleProp][prop] = createRoleMethod prop, roleMethod, objectMethod
 				
-					# Restore original context role
-					context[roleProperty] = context.constructor.prototype[roleProperty]
-					delete context.unbind
-						
+				# If name collision, set rolePlayer property as well.
+				rolePlayer[prop] = context[roleProp][prop] if roleMethod and objectMethod
+			

@@ -9,138 +9,151 @@
 
   top.Ivento.Dci.Context = Context = (function() {
 
-    function Context(__contextProperty) {
-      this.__contextProperty = __contextProperty;
-    }
+    function Context() {}
 
     Context.prototype.bind = function(rolePlayer) {
-      return Context.bind(this, rolePlayer, this.__contextProperty);
+      return Context.bind(this, rolePlayer);
     };
 
-    Context.isFunction = function(obj) {
-      return !!(obj && obj.constructor && obj.call && obj.apply);
-    };
-
-    Context.isObject = function(obj) {
-      return obj !== null && typeof obj === 'object';
-    };
-
-    Context.bind = function(context, rolePlayer, contextProperty) {
-      var contextCache, rolePlayerCacheId, _base1;
-      if (contextProperty == null) {
-        contextProperty = 'context';
+    Context.bind = function(context, rolePlayer) {
+      var createContextMethod, field, isContextMethod, isFunction, isObject, isRoleMethod, isRoleObject, prop, roleMethod, roleName, _ref;
+      isFunction = function(x) {
+        return !!(x && x.constructor && x.call && x.apply);
+      };
+      isObject = function(x) {
+        return x !== null && typeof x === 'object';
+      };
+      isRoleObject = function(field) {
+        return isObject(field);
+      };
+      isContextMethod = function(prop) {
+        return prop[0] !== '_' && prop !== 'constructor' && isFunction(context[prop]);
+      };
+      isRoleMethod = function(prop, method) {
+        return prop[0] !== '_' && prop !== 'constructor' && isFunction(method);
+      };
+      createContextMethod = function(prop) {
+        return function() {
+          var prevContext;
+          prevContext = Context.__current;
+          Context.__current = context;
+          try {
+            return context.constructor.prototype[prop].apply(context, arguments);
+          } finally {
+            Context.__current = prevContext;
+          }
+        };
+      };
+      if (!(context.__methodBound != null)) {
+        context.__methodBound = true;
+        _ref = context.constructor.prototype;
+        for (prop in _ref) {
+          field = _ref[prop];
+          if (isContextMethod(prop)) {
+            context.constructor.prototype[prop].__contextMethod = true;
+            context[prop] = createContextMethod(prop);
+          } else if (isRoleObject(field)) {
+            for (roleName in field) {
+              roleMethod = field[roleName];
+              if (isRoleMethod(roleName, roleMethod)) {
+                context.constructor.prototype[prop][roleName].__contextMethod = prop;
+              }
+            }
+          }
+        }
       }
-      context.__contextCacheId || (context.__contextCacheId = 0);
-      rolePlayerCacheId = ++context.__contextCacheId;
-      context.__contextCache || (context.__contextCache = {});
-      (_base1 = context.__contextCache)[rolePlayerCacheId] || (_base1[rolePlayerCacheId] = {});
-      contextCache = context.__contextCache;
       return {
-        to: function(role) {
-          var applyRoleMethod, assignRoleMethod, cacheFor, contextIsBound, contextRole, decorateContextMethods, field, isValidContextProperty, prop, roleProperty, setCacheFor, _i, _len, _ref;
-          roleProperty = null;
+        to: function(role, contextProperty) {
+          var createRoleMethod, objectMethod, roleKeys, rolePlayerType, roleProp, _i, _j, _len, _len1, _ref1, _ref2, _results;
+          if (contextProperty == null) {
+            contextProperty = 'context';
+          }
+          roleProp = null;
           for (prop in context) {
             field = context[prop];
             if (field === role) {
-              roleProperty = prop;
-              context[prop] = rolePlayer;
+              roleProp = prop;
               break;
             }
           }
-          if (!roleProperty) {
+          if (!roleProp) {
             throw "Role for RolePlayer not found in Context.";
           }
-          cacheFor = function(prop) {
-            if (!(contextCache[rolePlayerCacheId] != null)) {
-              throw "Object for " + rolePlayer + " not found in context cache.";
-            }
-            return contextCache[rolePlayerCacheId][prop];
-          };
-          setCacheFor = function(prop, value) {
-            return contextCache[rolePlayerCacheId][prop] = value;
-          };
-          isValidContextProperty = function(obj, prop) {
-            return prop !== 'constructor' && prop !== '_contract' && obj.hasOwnProperty(prop);
-          };
-          contextIsBound = function() {
-            return context.unbind != null;
-          };
-          contextRole = function() {
-            return context.constructor.prototype[roleProperty];
-          };
-          decorateContextMethods = function(obj, roleMethods) {
-            var _results;
-            _results = [];
-            for (prop in obj) {
-              field = obj[prop];
-              if (isValidContextProperty(obj, prop)) {
-                if (!field.__contextMethod && Context.isFunction(field)) {
-                  _results.push(field.__contextMethod = roleMethods ? roleProperty : true);
-                } else if (prop === roleProperty) {
-                  _results.push(decorateContextMethods(field, true));
-                } else {
-                  _results.push(void 0);
-                }
-              }
-            }
-            return _results;
-          };
-          applyRoleMethod = function(prop) {
-            return function() {
-              var contextCaller, method, objectMethod;
-              objectMethod = cacheFor(prop);
-              contextCaller = arguments.callee.caller.__contextMethod;
-              if (!objectMethod || contextCaller === true || contextCaller === roleProperty) {
-                method = role[prop];
-              } else {
-                method = objectMethod;
-              }
-              return method.apply(rolePlayer, arguments);
-            };
-          };
-          assignRoleMethod = function(prop, value) {
-            var cache;
-            if (value == null) {
-              value = null;
-            }
-            cache = rolePlayer.hasOwnProperty(prop) ? rolePlayer[prop] : false;
-            setCacheFor(prop, cache);
-            return rolePlayer[prop] = value != null ? value : applyRoleMethod(prop);
-          };
           if (role._contract != null) {
-            _ref = role._contract;
-            for (_i = 0, _len = _ref.length; _i < _len; _i++) {
-              prop = _ref[_i];
+            _ref1 = role._contract;
+            for (_i = 0, _len = _ref1.length; _i < _len; _i++) {
+              prop = _ref1[_i];
               if (!(prop in rolePlayer)) {
                 throw "RolePlayer " + rolePlayer + " didn't fulfill Role Contract with property '" + prop + "'.";
               }
             }
           }
-          decorateContextMethods(context.constructor.prototype, false);
-          for (prop in role) {
-            field = role[prop];
-            if (isValidContextProperty(role, prop)) {
-              assignRoleMethod(prop);
-            }
-          }
-          assignRoleMethod(contextProperty, context);
-          if (!contextIsBound()) {
-            return context.unbind = function() {
-              var cache, id;
-              for (id in contextCache) {
-                for (prop in contextCache[id]) {
-                  cache = contextCache[id][prop];
-                  if (cache) {
-                    rolePlayer[prop] = cache;
-                  } else {
-                    delete rolePlayer[prop];
-                  }
+          roleKeys = function() {
+            var keys;
+            keys = (function() {
+              var _ref2, _results;
+              _ref2 = context.constructor.prototype[roleProp];
+              _results = [];
+              for (prop in _ref2) {
+                field = _ref2[prop];
+                if (isRoleMethod(prop, field)) {
+                  _results.push(prop);
                 }
               }
-              context[roleProperty] = context.constructor.prototype[roleProperty];
-              return delete context.unbind;
+              return _results;
+            })();
+            if (role._contract != null) {
+              keys = keys.concat(role._contract);
+            }
+            return keys;
+          };
+          createRoleMethod = function(prop, roleMethod, objectMethod) {
+            return function() {
+              var calledFromContext, caller, oldContext;
+              oldContext = rolePlayer[contextProperty];
+              rolePlayer[contextProperty] = Context.__current;
+              caller = arguments.callee.caller.__contextMethod;
+              calledFromContext = caller === true || caller === roleProp;
+              try {
+                if ((roleMethod != null) && !(objectMethod != null)) {
+                  return context.constructor.prototype[roleProp][prop].apply(rolePlayer, arguments);
+                }
+                if ((objectMethod != null) && !(roleMethod != null)) {
+                  return objectMethod.apply(rolePlayer, arguments);
+                }
+                if (roleMethod && objectMethod) {
+                  if (calledFromContext) {
+                    return context.constructor.prototype[roleProp][prop].apply(rolePlayer, arguments);
+                  } else {
+                    return objectMethod.apply(rolePlayer, arguments);
+                  }
+                }
+                throw "No Role Method or Object Method '" + prop + "' found.";
+              } finally {
+                if (oldContext != null) {
+                  rolePlayer[contextProperty] = oldContext;
+                } else {
+                  delete rolePlayer[contextProperty];
+                }
+              }
             };
+          };
+          rolePlayerType = typeof rolePlayer;
+          context[roleProp] = rolePlayerType === 'boolean' || rolePlayerType === 'number' || rolePlayerType === 'string' ? rolePlayer : {};
+          _ref2 = roleKeys();
+          _results = [];
+          for (_j = 0, _len1 = _ref2.length; _j < _len1; _j++) {
+            prop = _ref2[_j];
+            roleMethod = context.constructor.prototype[roleProp][prop];
+            objectMethod = rolePlayer[prop];
+            context[roleProp][prop] = createRoleMethod(prop, roleMethod, objectMethod);
+            if (roleMethod && objectMethod) {
+              _results.push(rolePlayer[prop] = context[roleProp][prop]);
+            } else {
+              _results.push(void 0);
+            }
           }
+          return _results;
         }
       };
     };

@@ -7,6 +7,8 @@ describe "Ivento.Dci.Context", ->
 		# ===== Roles =====
 
 		ledgers:
+			_contract: ['push', 'reduce']
+
 			addEntry: (message, amount) ->
 				@push message: message, amount: amount
 
@@ -33,6 +35,8 @@ describe "Ivento.Dci.Context", ->
 		# ===== Roles =====
 
 		ledgers:
+			_contract: ['entries']
+
 			getBalance: () ->
 				@entries.reduce ((prev, curr) -> prev + curr.amount), 0
 
@@ -40,7 +44,6 @@ describe "Ivento.Dci.Context", ->
 		
 		balance: () -> @ledgers.getBalance()
 
-	ctx = null
 	entries = null
 
 	beforeEach ->
@@ -50,32 +53,35 @@ describe "Ivento.Dci.Context", ->
 			message: "First deposit", amount: 1000
 		]
 
-		ctx = new Account entries
+		window.entries = entries
 
 	describe "Binding behaviour", ->
 
+		ctx = null
+
+		beforeEach ->
+			ctx = new Account entries
+
 		it "should bind objects to roles using the bind() method", ->
-			expect(ctx.ledgers).toBe(entries)
-			expect(ctx.ledgers.getBalance()).toEqual(1100)
+			expect(ctx.ledgers).toBeDefined()
 
 		it "should be able to use the context methods", ->
-			expect(ctx.balance()).toEqual(ctx.ledgers.getBalance())
+			expect(ctx.balance()).toEqual(1100)
 
 		it "should modify the rolePlayers correctly", ->
-			expect(ctx.ledgers).toBe(entries)
-			expect(ctx.ledgers.length).toBe(2)
+			expect(entries.length).toBe(2)
 
 			ctx.increaseBalance 200
 			
-			expect(ctx.ledgers).toBe(entries)
-			expect(ctx.ledgers.length).toBe(3)
-			expect(ctx.ledgers[2]).toEqual(message: "Depositing", amount: 200)
+			expect(entries.length).toBe(3)
+
+			expect(entries[2]).toEqual(message: "Depositing", amount: 200)
 			expect(ctx.balance()).toEqual(1300)
 
 			ctx.decreaseBalance 1500
 			
 			expect(ctx.balance()).toEqual(-200)
-			expect(ctx.ledgers[3]).toEqual(message: "Withdrawing", amount: -1500)
+			expect(entries[3]).toEqual(message: "Withdrawing", amount: -1500)
 
 		it "should bind to objects not using inheritance with the static method.", ->
 			simple = new SimplerAccount entries
@@ -92,14 +98,18 @@ describe "Ivento.Dci.Context", ->
 			# ===== Roles =====
 
 			source:
+				_contract: ['decreaseBalance']
+
 				withdraw: (amount) -> 
 					@decreaseBalance amount
 
 				transfer: (amount) ->
 					@context.destination.deposit amount
-					@withdraw amount
+					@context.source.withdraw amount
 
 			destination:
+				_contract: ['increaseBalance']
+
 				deposit: (amount) -> 
 					@increaseBalance amount
 
@@ -114,15 +124,17 @@ describe "Ivento.Dci.Context", ->
 		it "should transfer money using Accounts", ->
 			
 			src = new Account entries
+			src.name = "src"
+
 			dest = new Account
-			amount = 200
+			dest.name = "dest"
 
 			expect(src.balance()).toEqual(1100)
 			expect(dest.balance()).toEqual(0)
 
-			context = new MoneyTransfer src, dest, amount
+			context = new MoneyTransfer src, dest, 200
 			context.transfer()
-			context.unbind()
+			#context.unbind()
 
 			expect(src.balance()).toEqual(900)
 			expect(dest.balance()).toEqual(200)
@@ -143,6 +155,12 @@ describe "Ivento.Dci.Context", ->
 			guests:
 				_contract: ['add', 'remove']
 
+			greet: () ->
+				@waiter.greetGuests()
+
+			addGuest: (name) ->
+				@guests.add name
+
 		it "should ensure that the RolePlayer has all contract properties in the _contract array", ->
 			person =
 				name: "Henry"
@@ -152,8 +170,8 @@ describe "Ivento.Dci.Context", ->
 			guests.remove = (g) -> delete @[g]
 
 			context = new Restaurant guests, person
-			expect(context.waiter.greetGuests()).toEqual "Welcome, my name is Henry, I'll be your waiter tonight."
-			expect(context.guests.add "Someone").toEqual 1
+			expect(context.greet()).toEqual "Welcome, my name is Henry, I'll be your waiter tonight."
+			expect(context.addGuest "Someone").toEqual 1
 
 		it "should throw an Exception if the RolePlayer doesn't have all the properties in the _contract array", ->
 			anonymous = {}
@@ -165,6 +183,49 @@ describe "Ivento.Dci.Context", ->
 			expect(() -> new Restaurant guests, anonymous).toThrow "RolePlayer [object Object] didn't fulfill Role Contract with property 'name'."
 
 	describe "Role method accessing behavior for name conflicts", ->
+
+		class LogAccount extends Ivento.Dci.Context
+			constructor: (account) ->
+				@bind(account).to(@account)
+
+			account:
+				_contract: ['save', 'write']
+
+				transfer: () ->
+					@save()
+					@write()
+
+				write: () ->
+					@logWritten = true
+
+			transfer: () ->
+				@account.transfer()
+
+		class DbAccount
+			constructor: (@amount) ->
+				
+			save: () =>
+				@write() if @validate()
+
+			validate: () =>
+				@amount > 0
+
+			write: () =>
+				@dbWritten = true
+
+		class MultiRoles extends Ivento.Dci.Context
+			constructor: (object = {}) ->
+				@bind(object).to(@source)
+				@bind(object).to(@target)
+
+			source:
+				foo: () -> "source"
+
+			target:
+				foo: () -> "target"
+
+			doIt: () ->
+				@source.foo() + @target.foo()
 
 		class Game extends Ivento.Dci.Context
 			constructor: (player) ->
@@ -192,35 +253,6 @@ describe "Ivento.Dci.Context", ->
 			judgeGame: () ->
 				@judge.judgeGame()
 
-		class LogAccount extends Ivento.Dci.Context
-			constructor: (account) ->
-				@bind(account).to(@account)
-
-			account:
-				_contract: ['amount', 'save', 'write']
-
-				transfer: () ->
-					@save()
-					@write()
-
-				write: () ->
-					@logWritten = true
-
-			transfer: () ->
-				@account.transfer()
-
-		class DbAccount
-			constructor: (@amount) ->
-				
-			save: () =>
-				@write() if @validate()
-
-			validate: () =>
-				@amount > 0
-
-			write: () =>
-				@dbWritten = true
-
 		it "should call the instance method of object.foo even if the object has a role.foo method defined, if called outside the context", ->
 
 			person =
@@ -228,9 +260,13 @@ describe "Ivento.Dci.Context", ->
 				bar: () -> @foo()
 
 			game = new Game person
+
 			expect(game.play()).toEqual("Object method foo")
 			expect(game.playFoo()).toEqual("Role method foo")
 			expect(game.judgeGame()).toEqual("Judge: Object method foo")
+
+			expect(person.foo()).toEqual("Object method foo")
+			expect(person.bar()).toEqual("Object method foo")
 
 		it "should call the role method role.foo even if the object has a object.foo defined, if called inside the context", ->
 			dbAccount = new DbAccount 123
@@ -243,6 +279,11 @@ describe "Ivento.Dci.Context", ->
 
 			expect(dbAccount.logWritten).toBeTruthy()
 			expect(dbAccount.dbWritten).toBeTruthy()
+
+		it "should call methods depending on what role they were called from", ->
+			
+			context = new MultiRoles
+			expect(context.doIt()).toEqual("sourcetarget")
 
 	describe "Unbinding behavior", ->
 		
@@ -281,26 +322,12 @@ describe "Ivento.Dci.Context", ->
 			xRay: () -> 
 				@superman.useXRay()
 
-		it "should have an unbind method added after the first bind", ->
-			spider = new SpiderMan man
-			expect(spider.unbind).toBeUndefined()
-
-			superMan = new SuperMan man
-			expect(superMan.unbind).toBeDefined()
-
 		it "should remove the role methods from the rolePlayer when calling unbind", ->
 			superMan = new SuperMan man
 
 			# Cannot use xRay outside context.
 			expect(man.useXRay()).toEqual("Prevented by glasses.")
-			expect(man.fly()).toEqual("wheee!")
-
-			expect(superMan.superman.name).toBeDefined()
-			expect(superMan.xRay()).toEqual("wzzzt!")
-
-			superMan.unbind()
-
 			expect(man.fly).toBeUndefined()
-						
-			expect(superMan.unbind).toBeUndefined()
+			expect(superMan.xRay()).toEqual("wzzzt!")
+			expect(-> superMan.superman.fly()).toThrow "Access to Role 'superman.fly' from outside Context."
 			expect(superMan.superman.name).toBeUndefined()
