@@ -3,24 +3,17 @@ describe "Ivento.Dci.Context", ->
 	class Account extends Ivento.Dci.Context
 		constructor: (entries = []) ->
 			@bind(entries).to(@ledgers)
-			@bind(entries).to(@balancer)
 
 		# ===== Roles =====
 
-		balancer:
-			_contract: ['reduce']
-
-			getBalance: () ->
-				@reduce ((prev, curr) -> prev + curr.amount), 0
-
 		ledgers:
-			_contract: ['push']
+			_contract: ['push', 'reduce']
 
 			addEntry: (message, amount) ->
 				@push message: message, amount: amount
 
 			getBalance: () ->
-				@context.balancer.getBalance()
+				@reduce ((prev, curr) -> prev + curr.amount), 0
 		
 		# ===== End roles =====
 
@@ -112,7 +105,7 @@ describe "Ivento.Dci.Context", ->
 
 				transfer: (amount) ->
 					@context.destination.deposit amount
-					@context.source.withdraw amount
+					@withdraw amount
 
 			destination:
 				_contract: ['increaseBalance']
@@ -217,20 +210,6 @@ describe "Ivento.Dci.Context", ->
 			write: () =>
 				@dbWritten = true
 
-		class MultiRoles extends Ivento.Dci.Context
-			constructor: (object = {}) ->
-				@bind(object).to(@source)
-				@bind(object).to(@target)
-
-			source:
-				foo: () -> "source"
-
-			target:
-				foo: () -> "target"
-
-			doIt: () ->
-				@source.foo() + @target.foo()
-
 		class Game extends Ivento.Dci.Context
 			constructor: (player) ->
 				@bind(player).to(@player)
@@ -284,10 +263,72 @@ describe "Ivento.Dci.Context", ->
 			expect(dbAccount.logWritten).toBeTruthy()
 			expect(dbAccount.dbWritten).toBeTruthy()
 
-		it "should call methods depending on what role they were called from", ->
-			
-			context = new MultiRoles
-			expect(context.doIt()).toEqual("sourcetarget")
+		it "should throw an exception if multiple roles have the same role method name", ->
+
+			class ConflictRoleMethodNames extends Ivento.Dci.Context
+				constructor: (object = {}) ->
+					@bind(object).to(@source)
+					@bind(object).to(@target)
+
+				source:
+					foo: () -> "source"
+
+				target:
+					foo: () -> "target"
+
+				doIt: () ->
+					@source.foo() + @target.foo()
+
+			expect(-> new ConflictRoleMethodNames()).toThrow("Method name conflict in Roles 'source.foo' and 'target.foo'. Please prepend the Role names to the methods to avoid conflict.")
+
+	describe "Context access from Role methods", ->
+		
+		class C1 extends Ivento.Dci.Context
+			constructor: (o) ->
+				@bind(o).to(@R1)
+				@bind("C1").to(@name)
+
+			# Role for testing object identity and context access
+			R1:
+				name: () ->
+					@ + ":" + @context.name
+
+			name:
+				{}
+
+			getName: () ->
+				# Create a nested context
+				c2 = new C2(@R1)
+
+				# Test if the current context retains after creating a nested context
+				output = @R1.name() + "/" 
+
+				# Test of the nested context uses itself as current
+				output += c2.getName()
+
+				# Test if the nested context is unbound after calling a context method
+				output += "/" + @R1.name()
+
+		class C2 extends Ivento.Dci.Context
+			constructor: (o) ->
+				@bind(o).to(@R2)
+				@bind("C2").to(@name)
+
+			# Role for testing object identity and context access in a nested context
+			R2:
+				name: () ->
+					@ + ":" + @context.name
+
+			name:
+				{}
+
+			getName: () ->
+				@R2.name()
+
+
+		it "should access the correct context and objects should keep identity", ->
+			a = toString: () -> "A"
+			expect(new C1(a).getName()).toEqual("A:C1/A:C2/A:C1")
 
 	describe "Unbinding behavior", ->
 		
@@ -326,13 +367,16 @@ describe "Ivento.Dci.Context", ->
 			xRay: () -> 
 				@superman.useXRay()
 
-		it "should prevent access to Roles outside the Context.", ->
+		it "should remove the role methods from the rolePlayer when calling unbind", ->
 			superMan = new SuperMan man
 
 			# Cannot use xRay outside context.
 			expect(man.useXRay()).toEqual("Prevented by glasses.")
 			expect(man.fly).toBeUndefined()
-			expect(superMan.xRay()).toEqual("wzzzt!")
-			# Does not work with Iced Coffeescript:
-			#expect(-> superMan.superman.fly()).toThrow "Access to Role 'superman.fly' from outside Context."
+
 			expect(superMan.superman.name).toBeUndefined()
+			expect(superMan.xRay()).toEqual("wzzzt!")
+
+			superMan.unbind()			
+			
+			expect(man.fly).toBeUndefined()

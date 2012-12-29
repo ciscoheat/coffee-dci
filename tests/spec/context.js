@@ -14,20 +14,10 @@
           entries = [];
         }
         this.bind(entries).to(this.ledgers);
-        this.bind(entries).to(this.balancer);
       }
 
-      Account.prototype.balancer = {
-        _contract: ['reduce'],
-        getBalance: function() {
-          return this.reduce((function(prev, curr) {
-            return prev + curr.amount;
-          }), 0);
-        }
-      };
-
       Account.prototype.ledgers = {
-        _contract: ['push'],
+        _contract: ['push', 'reduce'],
         addEntry: function(message, amount) {
           return this.push({
             message: message,
@@ -35,7 +25,9 @@
           });
         },
         getBalance: function() {
-          return this.context.balancer.getBalance();
+          return this.reduce((function(prev, curr) {
+            return prev + curr.amount;
+          }), 0);
         }
       };
 
@@ -144,7 +136,7 @@
           },
           transfer: function(amount) {
             this.context.destination.deposit(amount);
-            return this.context.source.withdraw(amount);
+            return this.withdraw(amount);
           }
         };
 
@@ -237,7 +229,7 @@
       });
     });
     describe("Role method accessing behavior for name conflicts", function() {
-      var DbAccount, Game, LogAccount, MultiRoles;
+      var DbAccount, Game, LogAccount;
       LogAccount = (function(_super) {
 
         __extends(LogAccount, _super);
@@ -293,37 +285,6 @@
         return DbAccount;
 
       })();
-      MultiRoles = (function(_super) {
-
-        __extends(MultiRoles, _super);
-
-        function MultiRoles(object) {
-          if (object == null) {
-            object = {};
-          }
-          this.bind(object).to(this.source);
-          this.bind(object).to(this.target);
-        }
-
-        MultiRoles.prototype.source = {
-          foo: function() {
-            return "source";
-          }
-        };
-
-        MultiRoles.prototype.target = {
-          foo: function() {
-            return "target";
-          }
-        };
-
-        MultiRoles.prototype.doIt = function() {
-          return this.source.foo() + this.target.foo();
-        };
-
-        return MultiRoles;
-
-      })(Ivento.Dci.Context);
       Game = (function(_super) {
 
         __extends(Game, _super);
@@ -389,10 +350,106 @@
         expect(dbAccount.logWritten).toBeTruthy();
         return expect(dbAccount.dbWritten).toBeTruthy();
       });
-      return it("should call methods depending on what role they were called from", function() {
-        var context;
-        context = new MultiRoles;
-        return expect(context.doIt()).toEqual("sourcetarget");
+      return it("should throw an exception if multiple roles have the same role method name", function() {
+        var ConflictRoleMethodNames;
+        ConflictRoleMethodNames = (function(_super) {
+
+          __extends(ConflictRoleMethodNames, _super);
+
+          function ConflictRoleMethodNames(object) {
+            if (object == null) {
+              object = {};
+            }
+            this.bind(object).to(this.source);
+            this.bind(object).to(this.target);
+          }
+
+          ConflictRoleMethodNames.prototype.source = {
+            foo: function() {
+              return "source";
+            }
+          };
+
+          ConflictRoleMethodNames.prototype.target = {
+            foo: function() {
+              return "target";
+            }
+          };
+
+          ConflictRoleMethodNames.prototype.doIt = function() {
+            return this.source.foo() + this.target.foo();
+          };
+
+          return ConflictRoleMethodNames;
+
+        })(Ivento.Dci.Context);
+        return expect(function() {
+          return new ConflictRoleMethodNames();
+        }).toThrow("Method name conflict in Roles 'source.foo' and 'target.foo'. Please prepend the Role names to the methods to avoid conflict.");
+      });
+    });
+    describe("Context access from Role methods", function() {
+      var C1, C2;
+      C1 = (function(_super) {
+
+        __extends(C1, _super);
+
+        function C1(o) {
+          this.bind(o).to(this.R1);
+          this.bind("C1").to(this.name);
+        }
+
+        C1.prototype.R1 = {
+          name: function() {
+            return this + ":" + this.context.name;
+          }
+        };
+
+        C1.prototype.name = {};
+
+        C1.prototype.getName = function() {
+          var c2, output;
+          c2 = new C2(this.R1);
+          output = this.R1.name() + "/";
+          output += c2.getName();
+          return output += "/" + this.R1.name();
+        };
+
+        return C1;
+
+      })(Ivento.Dci.Context);
+      C2 = (function(_super) {
+
+        __extends(C2, _super);
+
+        function C2(o) {
+          this.bind(o).to(this.R2);
+          this.bind("C2").to(this.name);
+        }
+
+        C2.prototype.R2 = {
+          name: function() {
+            return this + ":" + this.context.name;
+          }
+        };
+
+        C2.prototype.name = {};
+
+        C2.prototype.getName = function() {
+          return this.R2.name();
+        };
+
+        return C2;
+
+      })(Ivento.Dci.Context);
+      return it("should access the correct context and objects should keep identity", function() {
+        var a;
+        a = {
+          toString: function() {
+            return "A";
+          }
+        };
+        return expect(new C1(a).getName()).toEqual("A:C1/A:C2/A:C1");
       });
     });
     return describe("Unbinding behavior", function() {
@@ -452,12 +509,14 @@
         return SuperMan;
 
       })(Ivento.Dci.Context);
-      return it("should prevent access to Roles outside the Context.", function() {
+      return it("should remove the role methods from the rolePlayer when calling unbind", function() {
         superMan = new SuperMan(man);
         expect(man.useXRay()).toEqual("Prevented by glasses.");
         expect(man.fly).toBeUndefined();
+        expect(superMan.superman.name).toBeUndefined();
         expect(superMan.xRay()).toEqual("wzzzt!");
-        return expect(superMan.superman.name).toBeUndefined();
+        superMan.unbind();
+        return expect(man.fly).toBeUndefined();
       });
     });
   });
