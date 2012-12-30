@@ -452,6 +452,47 @@
         return expect(new C1(a).getName()).toEqual("A:C1/A:C2/A:C1");
       });
     });
+    describe("Role access from outside Context", function() {
+      var MethodScopeTest;
+      MethodScopeTest = (function(_super) {
+
+        __extends(MethodScopeTest, _super);
+
+        function MethodScopeTest(o) {
+          this.bind(o).to(this.test);
+        }
+
+        MethodScopeTest.prototype.test = {
+          inside: function() {
+            return "inside";
+          }
+        };
+
+        MethodScopeTest.prototype.doIt = function() {
+          return this.test.inside();
+        };
+
+        return MethodScopeTest;
+
+      })(Ivento.Dci.Context);
+      return it("should not be allowed", function() {
+        var a, o;
+        o = {
+          outside: function() {
+            return "outside";
+          }
+        };
+        a = new MethodScopeTest(o);
+        expect(a.test).toBeDefined();
+        expect(function() {
+          return a.test.inside();
+        }).toThrow("Object #<Object> has no method 'inside'");
+        expect(a.doIt()).toEqual("inside");
+        return expect(function() {
+          return a.test.inside();
+        }).toThrow("Object #<Object> has no method 'inside'");
+      });
+    });
     describe("Asynchronous behavior", function() {
       var Async;
       Async = (function(_super) {
@@ -552,7 +593,7 @@
         return SuperMan;
 
       })(Ivento.Dci.Context);
-      return it("should remove the role methods from the rolePlayer automatically", function() {
+      it("should remove the role methods from the rolePlayer automatically", function() {
         superMan = new SuperMan(man);
         expect(man.useXRay()).toEqual("Prevented by glasses.");
         expect(man.fly).toBeUndefined();
@@ -560,6 +601,14 @@
         expect(superMan.xRay()).toEqual("wzzzt!");
         expect(superMan.execute()).toEqual("wheee!");
         return expect(man.fly).toBeUndefined();
+      });
+      return it("should remove special properties from the rolePlayer automatically", function() {
+        superMan = new SuperMan(man);
+        expect(man.context).toBeUndefined();
+        expect(man.promise).toBeUndefined();
+        expect(superMan.execute()).toEqual("wheee!");
+        expect(man.context).toBeUndefined();
+        return expect(man.promise).toBeUndefined();
       });
     });
   });

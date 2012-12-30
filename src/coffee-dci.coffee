@@ -62,8 +62,10 @@ top.Ivento.Dci.Context = class Context
 			for prop, roleMethod of context.constructor.prototype[roleName] when Context._isRoleMethod prop, roleMethod
 				rolePlayer[prop] = createRoleMethod prop, roleMethod, rolePlayer[prop]
 
-			# Assign properties to Role
+			# Assign properties to Role and save previous ones
 			binding.__oldContext = rolePlayer[binding.__contextProperty]
+			binding.__oldPromise = rolePlayer.promise
+
 			rolePlayer[binding.__contextProperty] = context
 			rolePlayer.promise = context[contextMethodName].__promise
 
@@ -134,8 +136,12 @@ top.Ivento.Dci.Context = class Context
 		if not context.__isBound?
 			context.__isBound = {}
 			proto = context.constructor.prototype
-			for prop, field of proto when isContextMethod prop
-				context[prop] = createContextMethod prop
+			for prop, field of proto 
+				if isContextMethod prop
+					context[prop] = createContextMethod prop
+				else if Context._isRoleObject field
+					# Clear Roles before they are bound so they cannot be called before a Context Method.
+					context[prop] = {}
 
 		# Return the 'to' method to complete the binding.
 		to: (role, contextProperty = 'context') ->
@@ -151,43 +157,52 @@ top.Ivento.Dci.Context = class Context
 			throw "Role for RolePlayer not found in Context." if not roleName
 
 			# Test if RolePlayer fulfills Role Contract
-			if role._contract?
-				for prop in role._contract
+			roleProto = context.constructor.prototype[roleName]
+			if roleProto._contract?
+				for prop in roleProto._contract
 					throw "RolePlayer "+rolePlayer+" didn't fulfill Role Contract with property '"+prop+"'." if not (prop of rolePlayer)						
 
-			context.__isBound[roleName] =
-				__rolePlayer: rolePlayer
-				__oldContext: null
-				__contextProperty: contextProperty
+			context.__isBound[roleName] = Context._defaultBinding rolePlayer, contextProperty
 
 	@unbind: (context, name = null) ->
 		unbindMethods = (roleName) ->
-			binding = context.__isBound[roleName]
-			rp = binding.__rolePlayer
-			for prop, field of binding when prop[0] isnt '_'
-				if field is true
-					delete rp[prop]
-				else
-					rp[prop] = field
 
-			oldContext = binding.__oldContext
+			binding = context.__isBound[roleName]
+			rolePlayer = binding.__rolePlayer
 			contextProperty = binding.__contextProperty
 
-			if oldContext is undefined
-				delete rp[contextProperty]
-			else
-				rp[contextProperty] = oldContext
+			# Unbind Role Methods
+			for prop, field of binding when prop[0] isnt '_'
+				if field is true
+					delete rolePlayer[prop]
+				else
+					rolePlayer[prop] = field
 
-			context.__isBound[roleName] =
-				__rolePlayer: rp
-				__oldContext: null
-				__contextProperty: contextProperty
+			# Unbind context and promise
+			oldContext = binding.__oldContext
+			if oldContext is undefined
+				delete rolePlayer[contextProperty]
+			else
+				rolePlayer[contextProperty] = oldContext
+
+			oldPromise = binding.__oldPromise
+			if oldPromise is undefined
+				delete rolePlayer.promise
+			else
+				rolePlayer.promise = oldPromise
+
+			context.__isBound[roleName] = Context._defaultBinding rolePlayer, contextProperty
 		
 		if not name?
 			unbindMethods roleName for roleName of context.__isBound
 		else
 			unbindMethods name
 
+	@_defaultBinding: (rolePlayer, contextProperty) ->
+		__rolePlayer: rolePlayer
+		__oldContext: null
+		__oldPromise: null
+		__contextProperty: contextProperty
 
 # ===== PromiseJS ========================
 `

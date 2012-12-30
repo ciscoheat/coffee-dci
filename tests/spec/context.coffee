@@ -330,6 +330,31 @@ describe "Ivento.Dci.Context", ->
 			a = toString: () -> "A"
 			expect(new C1(a).getName()).toEqual("A:C1/A:C2/A:C1")
 
+	describe "Role access from outside Context", ->
+
+		class MethodScopeTest extends Ivento.Dci.Context
+			constructor: (o) ->
+				@bind(o).to(@test)
+    
+			test:
+				inside: () -> 
+					"inside"
+    
+			doIt: () ->
+				@test.inside()
+
+		it "should not be allowed", ->
+  
+			o = outside: () -> "outside"
+			a = new MethodScopeTest o
+  
+			expect(a.test).toBeDefined()
+			expect(-> a.test.inside()).toThrow("Object #<Object> has no method 'inside'")
+
+			# Call Context Method to test automatic unbinding
+			expect(a.doIt()).toEqual("inside")
+			expect(-> a.test.inside()).toThrow("Object #<Object> has no method 'inside'")
+
 	describe "Asynchronous behavior", ->
 		
 		class Async extends Ivento.Dci.Context
@@ -414,3 +439,14 @@ describe "Ivento.Dci.Context", ->
 			expect(superMan.execute()).toEqual("wheee!")
 
 			expect(man.fly).toBeUndefined()
+
+		it "should remove special properties from the rolePlayer automatically", ->
+			superMan = new SuperMan man
+
+			expect(man.context).toBeUndefined()
+			expect(man.promise).toBeUndefined()
+
+			expect(superMan.execute()).toEqual("wheee!")
+
+			expect(man.context).toBeUndefined()
+			expect(man.promise).toBeUndefined()
