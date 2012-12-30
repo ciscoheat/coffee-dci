@@ -52,6 +52,7 @@
     <Content Include="tests\lib\jasmine-1.2.0\jasmine-html.js" />
     <Content Include="tests\lib\jasmine-1.2.0\jasmine.css" />
     <Content Include="tests\lib\jasmine-1.2.0\jasmine.js" />
+    <Content Include="tests\lib\jshashtable_src.js" />
     <Content Include="tests\SpecRunner.html" />
     <Content Include="tests\spec\context.js">
       <DependentUpon>context.coffee</DependentUpon>
@@ -59,11 +60,18 @@
     <Content Include="tests\spec\context.min.js">
       <DependentUpon>context.coffee</DependentUpon>
     </Content>
+    <Content Include="tests\spec\dijkstra.js">
+      <DependentUpon>dijkstra.coffee</DependentUpon>
+    </Content>
+    <Content Include="tests\spec\dijkstra.min.js">
+      <DependentUpon>dijkstra.coffee</DependentUpon>
+    </Content>
   </ItemGroup>
   <ItemGroup>
     <None Include="src\coffee-dci.coffee" />
     <None Include="tests\lib\jasmine-1.2.0\MIT.LICENSE" />
     <None Include="tests\spec\context.coffee" />
+    <None Include="tests\spec\dijkstra.coffee" />
   </ItemGroup>
   <ItemGroup />
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
