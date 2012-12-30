@@ -6,7 +6,7 @@ top.Ivento.Dci or= {}
 # Context class
 top.Ivento.Dci.Context = class Context
 
-	bind: (rolePlayer, contextProperty = 'context') -> Context.bind @, rolePlayer, contextProperty
+	bind: (rolePlayer) -> Context.bind @, rolePlayer
 	unbind: (name = null) -> Context.unbind @, name
 
 	@promise: () -> new top.promise.Promise()
@@ -18,14 +18,16 @@ top.Ivento.Dci.Context = class Context
 	@_isRoleObject: (field) -> @_isObject field
 	@_isRoleMethod: (prop, method) -> prop[0] isnt '_' and prop isnt 'constructor' and @._isFunction(method)
 
-	@bind: (context, rolePlayer, contextProperty = 'context') ->		
+	@bind: (context, rolePlayer) ->
 		
 		isContextMethod = (prop) -> 
 			prop[0] isnt '_' and 
 			not (prop in ['constructor', 'bind', 'unbind', 'promise']) and 
 			Context._isFunction(context[prop])
 
-		doBinding = (roleName, rolePlayer) ->
+		doBinding = (contextMethodName, roleName, rolePlayer) ->
+
+			binding = context.__isBound[roleName]
 
 			createRoleMethod = (prop, roleMethod, objectMethod) ->
 				# If only Object Method is available, nothing changes
@@ -34,18 +36,17 @@ top.Ivento.Dci.Context = class Context
 				throw "No Role method or Object method '" + prop + "' found." if not objectMethod? and not roleMethod?
 
 				if not objectMethod?
-					context.__isBound[roleName][prop] = true
+					binding[prop] = true
 				else
-					context.__isBound[roleName][prop] = objectMethod
+					binding[prop] = objectMethod
 
-				method = ->	
-
+				->
 					# If only Role Method is available, call it.						
 					return roleMethod.apply rolePlayer, arguments if not objectMethod?
 
 					# If both Role and Object Method is available, determine if method was called
 					# from a Context, and call Role Method if so, if not call Object Method.
-					caller = arguments.callee.caller.__contextMethod
+					caller = arguments.callee.caller.__inContext
 					calledFromContext = caller is true or caller is roleName
 
 					if calledFromContext
@@ -53,57 +54,58 @@ top.Ivento.Dci.Context = class Context
 					else
 						return objectMethod.apply rolePlayer, arguments # rolePlayer or this?
 
-				# Set context so it can be used in the Role Methods "context" method
-				method.__context = context
-				method
-
 			# If rebinding roles, unbind the current.
-			previousRolePlayer = context.__isBound[roleName].__rolePlayer
+			previousRolePlayer = binding.__rolePlayer
 			Context.unbind context, roleName if previousRolePlayer? and previousRolePlayer isnt rolePlayer
 
+			# Create role methods and assign them to the RolePlayer
 			for prop, roleMethod of context.constructor.prototype[roleName] when Context._isRoleMethod prop, roleMethod
 				rolePlayer[prop] = createRoleMethod prop, roleMethod, rolePlayer[prop]
+
+			# Assign properties to Role
+			binding.__oldContext = rolePlayer[binding.__contextProperty]
+			rolePlayer[binding.__contextProperty] = context
+			rolePlayer.promise = context[contextMethodName].__promise
 
 			# Assign RolePlayer to Role
 			context[roleName] = rolePlayer
 
-		doBindings = () ->
-			doBinding roleName, context.__isBound[roleName].__rolePlayer for roleName of context.__isBound				
+		doBindings = (contextMethodName) ->
+			for roleName of context.__isBound
+				doBinding contextMethodName, roleName, context.__isBound[roleName].__rolePlayer
 
-		createContextMethod = (prop) ->
+		createContextMethod = (contextMethodName) ->
 			-> 
-				oldContext = rolePlayer[contextProperty]
-				oldPromise = context.promise
+				oldPromise = context[contextMethodName].__promise
 
-				# Set the current context and create a promise that can be used in
-				# asynchronous operations.
-				rolePlayer[contextProperty] = context
+				if not oldPromise? or not Context.isPromise(oldPromise)
+					context[contextMethodName].__promise = Context.promise()
 
-				if not context.promise? or not Context.isPromise(context.promise)
-					context.promise = Context.promise()
-					Context.unbindPromise(context.promise).call context.promise, -> Context.unbind context
+					Context.unbindPromise(context[contextMethodName].__promise).call(
+						context[contextMethodName].__promise
+					, 
+						-> 
+							Context.unbind context
+							delete context.promise
+					)
 
-				doBindings()
+				doBindings contextMethodName
+
+				context.promise = context[contextMethodName].__promise
 
 				output = null
 				try
-					output = context.constructor.prototype[prop].apply context, arguments
+					output = context.constructor.prototype[contextMethodName].apply context, arguments
 					output
-
 				finally
 					if not output? or not Context.isPromise output
 						Context.unbind context
 
-						if oldContext is undefined
-							delete rolePlayer[contextProperty]
-						else
-							rolePlayer[contextProperty] = oldContext
-
-						if oldPromise isnt context.promise
+						if oldPromise isnt context[contextMethodName].__promise
 							if oldPromise is undefined
-								delete context.promise
+								delete context[contextMethodName].__promise
 							else
-								context.promise = oldPromise
+								context[contextMethodName].__promise = oldPromise
 
 		# Bind Context and Role methods to current context,
 		# to determine if the Context or the Object method should be called.
@@ -115,12 +117,12 @@ top.Ivento.Dci.Context = class Context
 			for prop, field of proto
 				if isContextMethod prop
 					# Context methods should always use the Role Method (true)
-					proto[prop].__contextMethod = true
+					proto[prop].__inContext = true
 				else if Context._isRoleObject field
 					roleName = prop
 					for roleMethodName, roleMethod of field when Context._isRoleMethod roleMethodName, roleMethod
 						# Role methods should be used in the same Role (Role name)
-						proto[prop][roleMethodName].__contextMethod = roleName
+						proto[prop][roleMethodName].__inContext = roleName
 
 						# Test for Role Method conflicts
 						if roleMethods[roleMethodName]?
@@ -136,7 +138,7 @@ top.Ivento.Dci.Context = class Context
 				context[prop] = createContextMethod prop
 
 		# Return the 'to' method to complete the binding.
-		to: (role) ->
+		to: (role, contextProperty = 'context') ->
 
 			roleName = null
 
@@ -153,18 +155,33 @@ top.Ivento.Dci.Context = class Context
 				for prop in role._contract
 					throw "RolePlayer "+rolePlayer+" didn't fulfill Role Contract with property '"+prop+"'." if not (prop of rolePlayer)						
 
-			context.__isBound[roleName] = __rolePlayer: rolePlayer
+			context.__isBound[roleName] =
+				__rolePlayer: rolePlayer
+				__oldContext: null
+				__contextProperty: contextProperty
 
 	@unbind: (context, name = null) ->
-		unbindMethods = (name) ->
-			rp = context.__isBound[name].__rolePlayer
-			for prop, field of context.__isBound[name] when prop isnt '__rolePlayer'
+		unbindMethods = (roleName) ->
+			binding = context.__isBound[roleName]
+			rp = binding.__rolePlayer
+			for prop, field of binding when prop[0] isnt '_'
 				if field is true
 					delete rp[prop]
 				else
 					rp[prop] = field
 
-			context.__isBound[name] = __rolePlayer: rp
+			oldContext = binding.__oldContext
+			contextProperty = binding.__contextProperty
+
+			if oldContext is undefined
+				delete rp[contextProperty]
+			else
+				rp[contextProperty] = oldContext
+
+			context.__isBound[roleName] =
+				__rolePlayer: rp
+				__oldContext: null
+				__contextProperty: contextProperty
 		
 		if not name?
 			unbindMethods roleName for roleName of context.__isBound
