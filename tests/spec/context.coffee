@@ -330,6 +330,48 @@ describe "Ivento.Dci.Context", ->
 			a = toString: () -> "A"
 			expect(new C1(a).getName()).toEqual("A:C1/A:C2/A:C1")
 
+	describe "Asynchronous behavior", ->
+		
+		class Async extends Ivento.Dci.Context
+			constructor: (o) ->
+				@bind(o).to(@ajax)
+
+			ajax:
+				_contract: ['output']
+
+				get: (cb) -> 
+					self = @
+					asyncOperation = () ->
+						self.output += "ASYNC"
+						cb()
+
+					setTimeout asyncOperation, 5
+					
+			afterAsync: () ->
+				@ajax.output += "After"
+
+			doItAsync: () ->
+				self = @
+				@ajax.get () -> self.promise.done()
+
+				@afterAsync()
+				@promise
+
+		it "should unbind a Context Method if a promise is returned from it and completed", ->			
+			o = output: ""
+
+			runs ->
+				a = new Async o
+				a.doItAsync()
+
+			waitsFor -> 
+				o.output.length > 5
+			, 
+				50
+
+			runs ->
+				expect(o.output).toEqual("AfterASYNC")
+
 	describe "Unbinding behavior", ->
 		
 		man = null
@@ -339,13 +381,6 @@ describe "Ivento.Dci.Context", ->
 			man = 
 				name: "Clark Kent"
 				useXRay: () -> "Prevented by glasses."
-
-		class SpiderMan extends Ivento.Dci.Context
-			constructor: (man) ->
-				# No bindings, so no unbind is added to Context object.
-
-			spiderman:
-				useWeb: () -> "fzzzt!"
 
 		class SuperMan extends Ivento.Dci.Context
 			constructor: (man) ->
@@ -367,7 +402,7 @@ describe "Ivento.Dci.Context", ->
 			xRay: () -> 
 				@superman.useXRay()
 
-		it "should remove the role methods from the rolePlayer when calling unbind", ->
+		it "should remove the role methods from the rolePlayer automatically", ->
 			superMan = new SuperMan man
 
 			# Cannot use xRay outside context.
@@ -376,7 +411,6 @@ describe "Ivento.Dci.Context", ->
 
 			expect(superMan.superman.name).toBeUndefined()
 			expect(superMan.xRay()).toEqual("wzzzt!")
+			expect(superMan.execute()).toEqual("wheee!")
 
-			superMan.unbind()			
-			
 			expect(man.fly).toBeUndefined()

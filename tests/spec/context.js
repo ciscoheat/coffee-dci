@@ -452,8 +452,66 @@
         return expect(new C1(a).getName()).toEqual("A:C1/A:C2/A:C1");
       });
     });
+    describe("Asynchronous behavior", function() {
+      var Async;
+      Async = (function(_super) {
+
+        __extends(Async, _super);
+
+        function Async(o) {
+          this.bind(o).to(this.ajax);
+        }
+
+        Async.prototype.ajax = {
+          _contract: ['output'],
+          get: function(cb) {
+            var asyncOperation, self;
+            self = this;
+            asyncOperation = function() {
+              self.output += "ASYNC";
+              return cb();
+            };
+            return setTimeout(asyncOperation, 5);
+          }
+        };
+
+        Async.prototype.afterAsync = function() {
+          return this.ajax.output += "After";
+        };
+
+        Async.prototype.doItAsync = function() {
+          var self;
+          self = this;
+          this.ajax.get(function() {
+            return self.promise.done();
+          });
+          this.afterAsync();
+          return this.promise;
+        };
+
+        return Async;
+
+      })(Ivento.Dci.Context);
+      return it("should unbind a Context Method if a promise is returned from it and completed", function() {
+        var o;
+        o = {
+          output: ""
+        };
+        runs(function() {
+          var a;
+          a = new Async(o);
+          return a.doItAsync();
+        });
+        waitsFor(function() {
+          return o.output.length > 5;
+        }, 50);
+        return runs(function() {
+          return expect(o.output).toEqual("AfterASYNC");
+        });
+      });
+    });
     return describe("Unbinding behavior", function() {
-      var SpiderMan, SuperMan, man, superMan;
+      var SuperMan, man, superMan;
       man = null;
       superMan = null;
       beforeEach(function() {
@@ -464,21 +522,6 @@
           }
         };
       });
-      SpiderMan = (function(_super) {
-
-        __extends(SpiderMan, _super);
-
-        function SpiderMan(man) {}
-
-        SpiderMan.prototype.spiderman = {
-          useWeb: function() {
-            return "fzzzt!";
-          }
-        };
-
-        return SpiderMan;
-
-      })(Ivento.Dci.Context);
       SuperMan = (function(_super) {
 
         __extends(SuperMan, _super);
@@ -509,13 +552,13 @@
         return SuperMan;
 
       })(Ivento.Dci.Context);
-      return it("should remove the role methods from the rolePlayer when calling unbind", function() {
+      return it("should remove the role methods from the rolePlayer automatically", function() {
         superMan = new SuperMan(man);
         expect(man.useXRay()).toEqual("Prevented by glasses.");
         expect(man.fly).toBeUndefined();
         expect(superMan.superman.name).toBeUndefined();
         expect(superMan.xRay()).toEqual("wzzzt!");
-        superMan.unbind();
+        expect(superMan.execute()).toEqual("wheee!");
         return expect(man.fly).toBeUndefined();
       });
     });

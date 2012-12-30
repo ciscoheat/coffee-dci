@@ -9,6 +9,10 @@ top.Ivento.Dci.Context = class Context
 	bind: (rolePlayer, contextProperty = 'context') -> Context.bind @, rolePlayer, contextProperty
 	unbind: (name = null) -> Context.unbind @, name
 
+	@promise: () -> new top.promise.Promise()
+	@unbindPromise: (p) -> p.then
+	@isPromise: (p) -> p.then? and p.done?
+
 	@_isObject: (x) -> !!(x isnt null and typeof x is 'object')
 	@_isFunction: (x) -> !!(x && x.constructor && x.call && x.apply)
 	@_isRoleObject: (field) -> @_isObject field
@@ -18,7 +22,7 @@ top.Ivento.Dci.Context = class Context
 		
 		isContextMethod = (prop) -> 
 			prop[0] isnt '_' and 
-			not (prop in ['constructor', 'bind', 'unbind']) and 
+			not (prop in ['constructor', 'bind', 'unbind', 'promise']) and 
 			Context._isFunction(context[prop])
 
 		doBinding = (roleName, rolePlayer) ->
@@ -69,21 +73,37 @@ top.Ivento.Dci.Context = class Context
 		createContextMethod = (prop) ->
 			-> 
 				oldContext = rolePlayer[contextProperty]
+				oldPromise = context.promise
+
+				# Set the current context and create a promise that can be used in
+				# asynchronous operations.
 				rolePlayer[contextProperty] = context
+
+				if not context.promise? or not Context.isPromise(context.promise)
+					context.promise = Context.promise()
+					Context.unbindPromise(context.promise).call context.promise, -> Context.unbind context
+
 				doBindings()
 
 				output = null
 				try
 					output = context.constructor.prototype[prop].apply context, arguments
 					output
+
 				finally
-					# TODO: Generic promise test
-					if not output?.then? and not output?.done?
+					if not output? or not Context.isPromise output
 						Context.unbind context
+
 						if oldContext is undefined
 							delete rolePlayer[contextProperty]
 						else
 							rolePlayer[contextProperty] = oldContext
+
+						if oldPromise isnt context.promise
+							if oldPromise is undefined
+								delete context.promise
+							else
+								context.promise = oldPromise
 
 		# Bind Context and Role methods to current context,
 		# to determine if the Context or the Object method should be called.

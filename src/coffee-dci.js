@@ -25,6 +25,18 @@
       return Context.unbind(this, name);
     };
 
+    Context.promise = function() {
+      return new top.promise.Promise();
+    };
+
+    Context.unbindPromise = function(p) {
+      return p.then;
+    };
+
+    Context.isPromise = function(p) {
+      return (p.then != null) && (p.done != null);
+    };
+
     Context._isObject = function(x) {
       return !!(x !== null && typeof x === 'object');
     };
@@ -47,7 +59,7 @@
         contextProperty = 'context';
       }
       isContextMethod = function(prop) {
-        return prop[0] !== '_' && !(prop === 'constructor' || prop === 'bind' || prop === 'unbind') && Context._isFunction(context[prop]);
+        return prop[0] !== '_' && !(prop === 'constructor' || prop === 'bind' || prop === 'unbind' || prop === 'promise') && Context._isFunction(context[prop]);
       };
       doBinding = function(roleName, rolePlayer) {
         var createRoleMethod, previousRolePlayer, prop, roleMethod, _ref;
@@ -103,21 +115,35 @@
       };
       createContextMethod = function(prop) {
         return function() {
-          var oldContext, output;
+          var oldContext, oldPromise, output;
           oldContext = rolePlayer[contextProperty];
+          oldPromise = context.promise;
           rolePlayer[contextProperty] = context;
+          if (!(context.promise != null) || !Context.isPromise(context.promise)) {
+            context.promise = Context.promise();
+            Context.unbindPromise(context.promise).call(context.promise, function() {
+              return Context.unbind(context);
+            });
+          }
           doBindings();
           output = null;
           try {
             output = context.constructor.prototype[prop].apply(context, arguments);
             return output;
           } finally {
-            if (!((output != null ? output.then : void 0) != null) && !((output != null ? output.done : void 0) != null)) {
+            if (!(output != null) || !Context.isPromise(output)) {
               Context.unbind(context);
               if (oldContext === void 0) {
                 delete rolePlayer[contextProperty];
               } else {
                 rolePlayer[contextProperty] = oldContext;
+              }
+              if (oldPromise !== context.promise) {
+                if (oldPromise === void 0) {
+                  delete context.promise;
+                } else {
+                  context.promise = oldPromise;
+                }
               }
             }
           }
