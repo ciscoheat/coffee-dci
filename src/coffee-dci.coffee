@@ -76,38 +76,36 @@ top.Ivento.Dci.Context = class Context
 			for roleName of context.__isBound
 				doBinding contextMethodName, roleName, context.__isBound[roleName].__rolePlayer
 
+		unbindContext = (context, oldPromise) ->
+			Context.unbind context
+
+			if oldPromise is undefined
+				delete context.promise
+			else
+				context.promise = oldPromise
+
 		createContextMethod = (contextMethodName) ->
 			-> 
-				oldPromise = context[contextMethodName].__promise
+				oldPromise = context.promise
 
-				if not oldPromise? or not Context.isPromise(oldPromise)
-					context[contextMethodName].__promise = Context.promise()
-
-					Context.unbindPromise(context[contextMethodName].__promise).call(
-						context[contextMethodName].__promise
-					, 
-						-> 
-							Context.unbind context
-							delete context.promise
-					)
+				context[contextMethodName].__promise or= Context.promise()
+				context.promise = context[contextMethodName].__promise
 
 				doBindings contextMethodName
-
-				context.promise = context[contextMethodName].__promise
 
 				output = null
 				try
 					output = context.constructor.prototype[contextMethodName].apply context, arguments
 					output
 				finally
-					if not output? or not Context.isPromise output
-						Context.unbind context
+					unbind = -> unbindContext context, oldPromise
 
-						if oldPromise isnt context[contextMethodName].__promise
-							if oldPromise is undefined
-								delete context[contextMethodName].__promise
-							else
-								context[contextMethodName].__promise = oldPromise
+					# Test if result was asynchronous
+					if output? and Context.isPromise output
+						Context.unbindPromise(output).call(output, unbind)
+					else
+						unbind()
+
 
 		# Bind Context and Role methods to current context,
 		# to determine if the Context or the Object method should be called.

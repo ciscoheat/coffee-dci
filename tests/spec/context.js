@@ -494,7 +494,7 @@
       });
     });
     describe("Asynchronous behavior", function() {
-      var Async;
+      var Async, o;
       Async = (function(_super) {
 
         __extends(Async, _super);
@@ -513,6 +513,9 @@
               return cb();
             };
             return setTimeout(asyncOperation, 5);
+          },
+          addOutput: function(s) {
+            return this.output += s;
           }
         };
 
@@ -521,23 +524,36 @@
         };
 
         Async.prototype.doItAsync = function() {
-          var self;
-          self = this;
+          var _this = this;
           this.ajax.get(function() {
-            return self.promise.done();
+            if (!(_this.promise != null)) {
+              throw "Promise should be defined";
+            }
+            return _this.promise.done();
           });
           this.afterAsync();
+          return this.promise;
+        };
+
+        Async.prototype.returnPromise = function() {
+          var _this = this;
+          this.ajax.output += "Return";
+          this.promise.then(function() {
+            return _this.ajax.addOutput("Promise");
+          });
           return this.promise;
         };
 
         return Async;
 
       })(Ivento.Dci.Context);
-      return it("should unbind a Context Method if a promise is returned from it and completed", function() {
-        var o;
-        o = {
+      o = null;
+      beforeEach(function() {
+        return o = {
           output: ""
         };
+      });
+      it("should unbind a Context Method if a promise is returned from it and completed", function() {
         runs(function() {
           var a;
           a = new Async(o);
@@ -549,6 +565,16 @@
         return runs(function() {
           return expect(o.output).toEqual("AfterASYNC");
         });
+      });
+      return it("should not unbind the Context Methods if a promise is returned and not completed", function() {
+        var a, p;
+        a = new Async(o);
+        p = a.returnPromise();
+        expect(o.output).toEqual("Return");
+        expect(o.get).toBeDefined();
+        p.done();
+        expect(o.get).toBeUndefined();
+        return expect(o.output).toEqual("ReturnPromise");
       });
     });
     return describe("Unbinding behavior", function() {

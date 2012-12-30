@@ -51,7 +51,7 @@
     };
 
     Context.bind = function(context, rolePlayer) {
-      var createContextMethod, doBinding, doBindings, field, isContextMethod, prop, proto, roleMethod, roleMethodName, roleMethods, roleName;
+      var createContextMethod, doBinding, doBindings, field, isContextMethod, prop, proto, roleMethod, roleMethodName, roleMethods, roleName, unbindContext;
       isContextMethod = function(prop) {
         return prop[0] !== '_' && !(prop === 'constructor' || prop === 'bind' || prop === 'unbind' || prop === 'promise') && Context._isFunction(context[prop]);
       };
@@ -109,33 +109,33 @@
         }
         return _results;
       };
+      unbindContext = function(context, oldPromise) {
+        Context.unbind(context);
+        if (oldPromise === void 0) {
+          return delete context.promise;
+        } else {
+          return context.promise = oldPromise;
+        }
+      };
       createContextMethod = function(contextMethodName) {
         return function() {
-          var oldPromise, output;
-          oldPromise = context[contextMethodName].__promise;
-          if (!(oldPromise != null) || !Context.isPromise(oldPromise)) {
-            context[contextMethodName].__promise = Context.promise();
-            Context.unbindPromise(context[contextMethodName].__promise).call(context[contextMethodName].__promise, function() {
-              Context.unbind(context);
-              return delete context.promise;
-            });
-          }
-          doBindings(contextMethodName);
+          var oldPromise, output, unbind, _base1;
+          oldPromise = context.promise;
+          (_base1 = context[contextMethodName]).__promise || (_base1.__promise = Context.promise());
           context.promise = context[contextMethodName].__promise;
+          doBindings(contextMethodName);
           output = null;
           try {
             output = context.constructor.prototype[contextMethodName].apply(context, arguments);
             return output;
           } finally {
-            if (!(output != null) || !Context.isPromise(output)) {
-              Context.unbind(context);
-              if (oldPromise !== context[contextMethodName].__promise) {
-                if (oldPromise === void 0) {
-                  delete context[contextMethodName].__promise;
-                } else {
-                  context[contextMethodName].__promise = oldPromise;
-                }
-              }
+            unbind = function() {
+              return unbindContext(context, oldPromise);
+            };
+            if ((output != null) && Context.isPromise(output)) {
+              Context.unbindPromise(output).call(output, unbind);
+            } else {
+              unbind();
             }
           }
         };

@@ -356,7 +356,7 @@ describe "Ivento.Dci.Context", ->
 			expect(-> a.test.inside()).toThrow("Object #<Object> has no method 'inside'")
 
 	describe "Asynchronous behavior", ->
-		
+
 		class Async extends Ivento.Dci.Context
 			constructor: (o) ->
 				@bind(o).to(@ajax)
@@ -371,19 +371,32 @@ describe "Ivento.Dci.Context", ->
 						cb()
 
 					setTimeout asyncOperation, 5
+
+				addOutput: (s) ->
+					@output += s
 					
 			afterAsync: () ->
 				@ajax.output += "After"
 
 			doItAsync: () ->
-				self = @
-				@ajax.get () -> self.promise.done()
+				@ajax.get () => 
+					throw "Promise should be defined" if not @promise?
+					@promise.done()
 
 				@afterAsync()
 				@promise
 
-		it "should unbind a Context Method if a promise is returned from it and completed", ->			
+			returnPromise: () ->
+				@ajax.output += "Return"
+				@promise.then => @ajax.addOutput "Promise"
+				@promise
+
+		o = null
+
+		beforeEach ->
 			o = output: ""
+
+		it "should unbind a Context Method if a promise is returned from it and completed", ->			
 
 			runs ->
 				a = new Async o
@@ -396,6 +409,19 @@ describe "Ivento.Dci.Context", ->
 
 			runs ->
 				expect(o.output).toEqual("AfterASYNC")
+
+		it "should not unbind the Context Methods if a promise is returned and not completed", ->
+			
+			a = new Async o
+			p = a.returnPromise()
+
+			expect(o.output).toEqual("Return")
+			expect(o.get).toBeDefined()
+
+			p.done()
+
+			expect(o.get).toBeUndefined()
+			expect(o.output).toEqual("ReturnPromise")
 
 	describe "Unbinding behavior", ->
 		
