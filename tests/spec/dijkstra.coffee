@@ -27,9 +27,10 @@ describe "Ivento.Dci.Examples.Dijkstra", ->
 			@_unvisited = @_tentativeDistances.clone()
 			@_unvisited.remove initialNode
 
-			@_rebind initialNode, @_unvisited, @_tentativeDistances
+			@_bindRoles initialNode, @_unvisited, @_tentativeDistances
 
-		_rebind: (currentNode, unvisitedSet, tentativeDistances) ->
+		_bindRoles: (currentNode, unvisitedSet, tentativeDistances) ->
+			# Set the initial node as current.
 			@bind(currentNode).to(@currentNode)
 			@bind(unvisitedSet).to(@unvisitedSet)
 			@bind(tentativeDistances).to(@tentativeDistances)
@@ -47,7 +48,8 @@ describe "Ivento.Dci.Examples.Dijkstra", ->
 
 		currentNode:
 			unvisitedNeighbors: () ->
-				@context._distances.get(@).keys()
+				neighbors = @context._distances.get(@)
+				if neighbors? then neighbors.keys() else []
 		
 			tentativeDistance: () ->
 				@context.tentativeDistances.get(@)
@@ -77,20 +79,31 @@ describe "Ivento.Dci.Examples.Dijkstra", ->
 
 		to: (destinationNode) ->
 
+			# For the current node, consider all of its unvisited neighbors and calculate their 
+			# tentative distances.
 			for neighbor in @currentNode.unvisitedNeighbors()
 				distance = @currentNode.tentativeDistance() + @currentNode.edgeDistance neighbor
 
+				# If the distance is less than the previously recorded tentative distance of 
+				# the neighbor, overwrite that distance.
 				if distance < @tentativeDistances.distance neighbor
 					@tentativeDistances.setDistance neighbor, distance
 
+					# Store this as the best path to the neighbor
+					@currentNode.hasSmallestEdgeDistanceTo neighbor
+
+			# Mark the current node as visited and remove it from the unvisited set.
 			@unvisitedSet.remove @currentNode
 
-			nextNode = @unvisitedSet.smallestTentativeDistanceNode()			
-			@currentNode.hasSmallestEdgeDistanceTo nextNode
+			# Set the unvisited node marked with the smallest tentative distance as the 
+			# next "current node"
+			nextNode = @unvisitedSet.smallestTentativeDistanceNode()
 
+			# Finish if the destination node has been marked visited.
 			return @_smallestDistance if nextNode is destinationNode
 			
-			@_rebind nextNode, @unvisitedSet, @tentativeDistances
+			# Rebind the Context to the next node and calculate its distances.
+			@_bindRoles nextNode, @unvisitedSet, @tentativeDistances
 			@to destinationNode
 
 
@@ -136,9 +149,11 @@ describe "Ivento.Dci.Examples.Dijkstra", ->
 			g - 1 - h - 2 - i
 			###
 
-			path = new ShortestPath(nodes, a).to(i)
+			from = a
+			to = i
+			path = new ShortestPath(nodes, from).to(to)
 
-			output = [i]
-			output.unshift path.get(output[0]) while output[0] != a
+			output = [to]
+			output.unshift path.get(output[0]) while output[0] != from
 
 			expect(output.join " -> ").toEqual("a -> d -> g -> h -> i")

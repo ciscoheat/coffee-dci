@@ -37,10 +37,10 @@
         this._tentativeDistances.put(initialNode, 0);
         this._unvisited = this._tentativeDistances.clone();
         this._unvisited.remove(initialNode);
-        this._rebind(initialNode, this._unvisited, this._tentativeDistances);
+        this._bindRoles(initialNode, this._unvisited, this._tentativeDistances);
       }
 
-      ShortestPath.prototype._rebind = function(currentNode, unvisitedSet, tentativeDistances) {
+      ShortestPath.prototype._bindRoles = function(currentNode, unvisitedSet, tentativeDistances) {
         this.bind(currentNode).to(this.currentNode);
         this.bind(unvisitedSet).to(this.unvisitedSet);
         return this.bind(tentativeDistances).to(this.tentativeDistances);
@@ -58,7 +58,13 @@
 
       ShortestPath.prototype.currentNode = {
         unvisitedNeighbors: function() {
-          return this.context._distances.get(this).keys();
+          var neighbors;
+          neighbors = this.context._distances.get(this);
+          if (neighbors != null) {
+            return neighbors.keys();
+          } else {
+            return [];
+          }
         },
         tentativeDistance: function() {
           return this.context.tentativeDistances.get(this);
@@ -100,15 +106,15 @@
           distance = this.currentNode.tentativeDistance() + this.currentNode.edgeDistance(neighbor);
           if (distance < this.tentativeDistances.distance(neighbor)) {
             this.tentativeDistances.setDistance(neighbor, distance);
+            this.currentNode.hasSmallestEdgeDistanceTo(neighbor);
           }
         }
         this.unvisitedSet.remove(this.currentNode);
         nextNode = this.unvisitedSet.smallestTentativeDistanceNode();
-        this.currentNode.hasSmallestEdgeDistanceTo(nextNode);
         if (nextNode === destinationNode) {
           return this._smallestDistance;
         }
-        this._rebind(nextNode, this.unvisitedSet, this.tentativeDistances);
+        this._bindRoles(nextNode, this.unvisitedSet, this.tentativeDistances);
         return this.to(destinationNode);
       };
 
@@ -117,7 +123,7 @@
     })(Ivento.Dci.Context);
     return describe("Using Dijkstras algorithm", function() {
       return it("should find the shortest path from a to i", function() {
-        var a, b, c, d, e, f, g, h, i, nodes, output, path;
+        var a, b, c, d, e, f, from, g, h, i, nodes, output, path, to;
         a = new String('a');
         b = new String('b');
         c = new String('c');
@@ -140,9 +146,11 @@
         			g - 1 - h - 2 - i
         */
 
-        path = new ShortestPath(nodes, a).to(i);
-        output = [i];
-        while (output[0] !== a) {
+        from = a;
+        to = i;
+        path = new ShortestPath(nodes, from).to(to);
+        output = [to];
+        while (output[0] !== from) {
           output.unshift(path.get(output[0]));
         }
         return expect(output.join(" -> ")).toEqual("a -> d -> g -> h -> i");
