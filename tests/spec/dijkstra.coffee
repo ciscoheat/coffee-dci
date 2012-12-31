@@ -1,96 +1,98 @@
 describe "Ivento.Dci.Examples.Dijkstra", ->
+	
+	class ShortestPath extends Ivento.Dci.Context
 
-	class SubGraph extends Ivento.Dci.Context
-		constructor: (node, graph) ->
-			@bind(node).to(@node)
-			@bind(graph).to(@graph)
+		_tentativeDistances: new Hashtable()
+		_distances: new Hashtable()
+		_unvisited: new Hashtable()
+		_smallestDistance: new Hashtable()
 
-			# Cannot call graph.updateDistance directly from constructor, 
-			# so this little hack is needed.
-			graph.distances.put(node, 0)
+		constructor: (nodes, initialNode) ->
+			
+			# Assign to every node a tentative distance value: 
+			# set it to zero for our initial node and to infinity for all other nodes.
+			for node in nodes
+				from = node[0]; to = node[1]; dist = node[2]
+
+				@_tentativeDistances.put from, Infinity if not @_tentativeDistances.containsKey from
+				@_tentativeDistances.put to, Infinity if not @_tentativeDistances.containsKey to
+				
+				@_distances.put from, new Hashtable() if not @_distances.containsKey from
+				@_distances.get(from).put(to, dist)
+
+			@_tentativeDistances.put initialNode, 0
+
+			# Create a set of the unvisited nodes called the unvisited set 
+			# consisting of all the nodes except the initial node.
+			@_unvisited = @_tentativeDistances.clone()
+			@_unvisited.remove initialNode
+
+			@_rebind initialNode, @_unvisited, @_tentativeDistances
+
+		_rebind: (currentNode, unvisitedSet, tentativeDistances) ->
+			@bind(currentNode).to(@currentNode)
+			@bind(unvisitedSet).to(@unvisitedSet)
+			@bind(tentativeDistances).to(@tentativeDistances)
 
 		# ===== Roles =====
 
-		graph:
-			_contract: ['nodes', 'distances', 'previous']
+		tentativeDistances:
+			_contract: ['get', 'put']
 
-			distanceBetween: (node, other) ->
-				@nodes.get(node).get(other)
+			distance: (node) ->
+				@get node
 
-			removeNode: () ->
-				@nodes.remove @context.node
+			setDistance: (node, distance) ->
+				@put node, distance
 
-			updateDistance: (node, distance) ->
-				@distances.put(node, distance)
-
-		node:
-			neighbors: () ->
-				@context.graph.nodes.get(@)
-
-			distance: () ->
-				@context.graph.distances.get(@)
-
-			isPreviousOf: (n) ->
-				@context.graph.previous.put(n, @)
-
-			distanceTo: (other) ->
-				@context.graph.distanceBetween @, other
-
-			neighborWithShortestPath: () ->
-				current = Infinity
-				output = null
-				for node in @context.graph.nodes.keys() 
-					distance = @context.graph.distances.get(node)
-					if distance < current
-						output = node
-						current = distance
-				output
+		currentNode:
+			unvisitedNeighbors: () ->
+				@context._distances.get(@).keys()
 		
+			tentativeDistance: () ->
+				@context.tentativeDistances.get(@)
+				
+			edgeDistance: (neighbor) ->
+				@context._distances.get(@).get(neighbor)
+
+			hasSmallestEdgeDistanceTo: (node) ->
+				@context._smallestDistance.put(node, @)
+
+		unvisitedSet:
+			_contract: ['remove']
+			
+			smallestTentativeDistanceNode: () ->
+				outputDistance = Infinity
+				output = null
+				
+				@context.tentativeDistances.each (node, distance) =>
+					return if not @containsKey(node)
+					if output is null or distance < outputDistance
+						dist = distance
+						output = node
+		
+				output
+
 		# ===== End roles =====
 
-		findShortestPath: () ->
-			neighbors = @node.neighbors()
-			return @graph.previous if neighbors.isEmpty()
+		to: (destinationNode) ->
 
-			for neighbor in neighbors.keys()
-				alt = @node.distance() + @node.distanceTo neighbor
-				if alt < @graph.distances.get neighbor
-					@graph.updateDistance neighbor, alt
-					@node.isPreviousOf neighbor
+			for neighbor in @currentNode.unvisitedNeighbors()
+				distance = @currentNode.tentativeDistance() + @currentNode.edgeDistance neighbor
 
-			@graph.removeNode()
-			next = @node.neighborWithShortestPath()
-			new SubGraph(next, @graph).findShortestPath()
+				if distance < @tentativeDistances.distance neighbor
+					@tentativeDistances.setDistance neighbor, distance
+
+			@unvisitedSet.remove @currentNode
+
+			nextNode = @unvisitedSet.smallestTentativeDistanceNode()			
+			@currentNode.hasSmallestEdgeDistanceTo nextNode
+
+			return @_smallestDistance if nextNode is destinationNode
 			
-			@graph.previous
+			@_rebind nextNode, @unvisitedSet, @tentativeDistances
+			@to destinationNode
 
-	class Node
-		constructor: (name) ->
-			@toString = () -> name
-
-	class Graph		
-		# Node -> double
-		distances: new Hashtable()
-
-		# Node -> Node
-		previous: new Hashtable()
-
-		# Node -> (Node -> double)
-		nodes: new Hashtable()
-
-		constructor: (nodes) ->
-			for node in nodes
-				from = node[0]
-				to = node[1]
-				dist = node[2]
-
-				@nodes.put from, new Hashtable() if not @nodes.containsKey from
-				@distances.put from, Infinity if not @distances.containsKey from
-
-				@nodes.put to, new Hashtable() if not @nodes.containsKey to
-				@distances.put to, Infinity if not @distances.containsKey to
-
-				@nodes.get(from).put(to, dist)
 
 	# ===== Test ==============================
 
@@ -98,17 +100,17 @@ describe "Ivento.Dci.Examples.Dijkstra", ->
 
 		it "should find the shortest path from a to i", ->
 
-			a = new Node 'a'
-			b = new Node 'b'
-			c = new Node 'c'
-			d = new Node 'd'
-			e = new Node 'e'
-			f = new Node 'f'
-			g = new Node 'g'
-			h = new Node 'h'
-			i = new Node 'i'
+			a = new String 'a'
+			b = new String 'b'
+			c = new String 'c'
+			d = new String 'd'
+			e = new String 'e'
+			f = new String 'f'
+			g = new String 'g'
+			h = new String 'h'
+			i = new String 'i'
 
-			paths = [
+			nodes = [
 				[a,b,2]
 				[a,d,1]
 				[b,c,3]
@@ -134,8 +136,7 @@ describe "Ivento.Dci.Examples.Dijkstra", ->
 			g - 1 - h - 2 - i
 			###
 
-			graph = new Graph paths
-			path = new SubGraph(a, graph).findShortestPath()
+			path = new ShortestPath(nodes, a).to(i)
 
 			output = [i]
 			output.unshift path.get(output[0]) while output[0] != a

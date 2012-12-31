@@ -9,25 +9,32 @@ top.Ivento.Dci.Context = class Context
 	bind: (rolePlayer) -> Context.bind @, rolePlayer
 	unbind: (name = null) -> Context.unbind @, name
 
+	@setPromiseAdapter: (settings) ->
+		Context.promise = settings.factory
+		Context.unbindPromise = settings.unbind
+		Context.isPromise = settings.identify
+
 	@promise: () -> new top.promise.Promise()
-	@unbindPromise: (p) -> p.then
+	@unbindPromise: (p, f) -> p.then f
 	@isPromise: (p) -> p.then? and p.done?
 
 	@_isObject: (x) -> !!(x isnt null and typeof x is 'object')
 	@_isFunction: (x) -> !!(x && x.constructor && x.call && x.apply)
-	@_isRoleObject: (field) -> @_isObject field
+	@_isRoleObject: (prop, field) -> prop[0] isnt '_' and @_isObject field
 	@_isRoleMethod: (prop, method) -> prop[0] isnt '_' and prop isnt 'constructor' and @._isFunction(method)
 
 	@bind: (context, rolePlayer) ->
 		
 		isContextMethod = (prop) -> 
 			prop[0] isnt '_' and 
-			not (prop in ['constructor', 'bind', 'unbind', 'promise']) and 
+			not (prop in ['constructor', 'bind', 'unbind']) and 
 			Context._isFunction(context[prop])
+
+		bindingFor = (roleName) -> Context._bindingFor context, roleName
 
 		doBinding = (contextMethodName, roleName, rolePlayer) ->
 
-			binding = context.__isBound[roleName]
+			binding = bindingFor roleName
 
 			createRoleMethod = (prop, roleMethod, objectMethod) ->
 				# If only Object Method is available, nothing changes
@@ -74,7 +81,7 @@ top.Ivento.Dci.Context = class Context
 
 		doBindings = (contextMethodName) ->
 			for roleName of context.__isBound
-				doBinding contextMethodName, roleName, context.__isBound[roleName].__rolePlayer
+				doBinding contextMethodName, roleName, bindingFor(roleName).__rolePlayer
 
 		unbindContext = (context, oldPromise) ->
 			Context.unbind context
@@ -102,7 +109,7 @@ top.Ivento.Dci.Context = class Context
 
 					# Test if result was asynchronous
 					if output? and Context.isPromise output
-						Context.unbindPromise(output).call(output, unbind)
+						Context.unbindPromise(output, unbind)
 					else
 						unbind()
 
@@ -118,7 +125,7 @@ top.Ivento.Dci.Context = class Context
 				if isContextMethod prop
 					# Context methods should always use the Role Method (true)
 					proto[prop].__inContext = true
-				else if Context._isRoleObject field
+				else if Context._isRoleObject prop, field
 					roleName = prop
 					for roleMethodName, roleMethod of field when Context._isRoleMethod roleMethodName, roleMethod
 						# Role methods should be used in the same Role (Role name)
@@ -137,12 +144,14 @@ top.Ivento.Dci.Context = class Context
 			for prop, field of proto 
 				if isContextMethod prop
 					context[prop] = createContextMethod prop
-				else if Context._isRoleObject field
+				else if Context._isRoleObject prop, field
 					# Clear Roles before they are bound so they cannot be called before a Context Method.
 					context[prop] = {}
 
 		# Return the 'to' method to complete the binding.
 		to: (role, contextProperty = 'context') ->
+
+			return if role is rolePlayer
 
 			roleName = null
 
@@ -165,7 +174,7 @@ top.Ivento.Dci.Context = class Context
 	@unbind: (context, name = null) ->
 		unbindMethods = (roleName) ->
 
-			binding = context.__isBound[roleName]
+			binding = Context._bindingFor context, roleName
 			rolePlayer = binding.__rolePlayer
 			contextProperty = binding.__contextProperty
 
@@ -195,6 +204,9 @@ top.Ivento.Dci.Context = class Context
 			unbindMethods roleName for roleName of context.__isBound
 		else
 			unbindMethods name
+
+	@_bindingFor: (context, roleName) ->
+		context.__isBound[roleName]
 
 	@_defaultBinding: (rolePlayer, contextProperty) ->
 		__rolePlayer: rolePlayer

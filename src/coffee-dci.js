@@ -22,12 +22,18 @@
       return Context.unbind(this, name);
     };
 
+    Context.setPromiseAdapter = function(settings) {
+      Context.promise = settings.factory;
+      Context.unbindPromise = settings.unbind;
+      return Context.isPromise = settings.identify;
+    };
+
     Context.promise = function() {
       return new top.promise.Promise();
     };
 
-    Context.unbindPromise = function(p) {
-      return p.then;
+    Context.unbindPromise = function(p, f) {
+      return p.then(f);
     };
 
     Context.isPromise = function(p) {
@@ -42,8 +48,8 @@
       return !!(x && x.constructor && x.call && x.apply);
     };
 
-    Context._isRoleObject = function(field) {
-      return this._isObject(field);
+    Context._isRoleObject = function(prop, field) {
+      return prop[0] !== '_' && this._isObject(field);
     };
 
     Context._isRoleMethod = function(prop, method) {
@@ -51,13 +57,16 @@
     };
 
     Context.bind = function(context, rolePlayer) {
-      var createContextMethod, doBinding, doBindings, field, isContextMethod, prop, proto, roleMethod, roleMethodName, roleMethods, roleName, unbindContext;
+      var bindingFor, createContextMethod, doBinding, doBindings, field, isContextMethod, prop, proto, roleMethod, roleMethodName, roleMethods, roleName, unbindContext;
       isContextMethod = function(prop) {
-        return prop[0] !== '_' && !(prop === 'constructor' || prop === 'bind' || prop === 'unbind' || prop === 'promise') && Context._isFunction(context[prop]);
+        return prop[0] !== '_' && !(prop === 'constructor' || prop === 'bind' || prop === 'unbind') && Context._isFunction(context[prop]);
+      };
+      bindingFor = function(roleName) {
+        return Context._bindingFor(context, roleName);
       };
       doBinding = function(contextMethodName, roleName, rolePlayer) {
         var binding, createRoleMethod, previousRolePlayer, prop, roleMethod, _ref;
-        binding = context.__isBound[roleName];
+        binding = bindingFor(roleName);
         createRoleMethod = function(prop, roleMethod, objectMethod) {
           if ((objectMethod != null) && !(roleMethod != null)) {
             return objectMethod;
@@ -105,7 +114,7 @@
         var roleName, _results;
         _results = [];
         for (roleName in context.__isBound) {
-          _results.push(doBinding(contextMethodName, roleName, context.__isBound[roleName].__rolePlayer));
+          _results.push(doBinding(contextMethodName, roleName, bindingFor(roleName).__rolePlayer));
         }
         return _results;
       };
@@ -133,7 +142,7 @@
               return unbindContext(context, oldPromise);
             };
             if ((output != null) && Context.isPromise(output)) {
-              Context.unbindPromise(output).call(output, unbind);
+              Context.unbindPromise(output, unbind);
             } else {
               unbind();
             }
@@ -148,7 +157,7 @@
           field = proto[prop];
           if (isContextMethod(prop)) {
             proto[prop].__inContext = true;
-          } else if (Context._isRoleObject(field)) {
+          } else if (Context._isRoleObject(prop, field)) {
             roleName = prop;
             for (roleMethodName in field) {
               roleMethod = field[roleMethodName];
@@ -172,7 +181,7 @@
           field = proto[prop];
           if (isContextMethod(prop)) {
             context[prop] = createContextMethod(prop);
-          } else if (Context._isRoleObject(field)) {
+          } else if (Context._isRoleObject(prop, field)) {
             context[prop] = {};
           }
         }
@@ -182,6 +191,9 @@
           var roleProto, _i, _len, _ref;
           if (contextProperty == null) {
             contextProperty = 'context';
+          }
+          if (role === rolePlayer) {
+            return;
           }
           roleName = null;
           for (prop in context) {
@@ -216,7 +228,7 @@
       }
       unbindMethods = function(roleName) {
         var binding, contextProperty, field, oldContext, oldPromise, prop, rolePlayer;
-        binding = context.__isBound[roleName];
+        binding = Context._bindingFor(context, roleName);
         rolePlayer = binding.__rolePlayer;
         contextProperty = binding.__contextProperty;
         for (prop in binding) {
@@ -252,6 +264,10 @@
       } else {
         return unbindMethods(name);
       }
+    };
+
+    Context._bindingFor = function(context, roleName) {
+      return context.__isBound[roleName];
     };
 
     Context._defaultBinding = function(rolePlayer, contextProperty) {
