@@ -13,7 +13,7 @@
         if (entries == null) {
           entries = [];
         }
-        this.bind(entries).to(this.ledgers);
+        this.bind(entries).to('ledgers');
       }
 
       Account.prototype.ledgers = {
@@ -51,7 +51,7 @@
       function SimplerAccount(entriesArray) {
         Ivento.Dci.Context.bind(this, {
           entries: entriesArray
-        }).to(this.ledgers);
+        }).to('ledgers');
       }
 
       SimplerAccount.prototype.ledgers = {
@@ -111,10 +111,46 @@
           amount: -1500
         });
       });
-      return it("should bind to objects not using inheritance with the static method.", function() {
+      it("should bind to objects not using inheritance with the static method.", function() {
         var simple;
         simple = new SimplerAccount(entries);
         return expect(simple.balance()).toEqual(1100);
+      });
+      it("should throw an exception if the Role name isn't found in the Context", function() {
+        var NoRoleFound;
+        NoRoleFound = (function(_super) {
+
+          __extends(NoRoleFound, _super);
+
+          function NoRoleFound() {
+            this.bind(123).to('nonExistentRole');
+          }
+
+          return NoRoleFound;
+
+        })(Ivento.Dci.Context);
+        return expect(function() {
+          return new NoRoleFound;
+        }).toThrow("Role 'nonExistentRole' not found in Context.");
+      });
+      return it("should throw an exception if the Role isn't bound as a string", function() {
+        var NoStringBinding;
+        NoStringBinding = (function(_super) {
+
+          __extends(NoStringBinding, _super);
+
+          function NoStringBinding() {
+            this.bind(123).to(this.role);
+          }
+
+          NoStringBinding.prototype.role = {};
+
+          return NoStringBinding;
+
+        })(Ivento.Dci.Context);
+        return expect(function() {
+          return new NoStringBinding;
+        }).toThrow("A Role must be bound as a string literal.");
       });
     });
     describe("MoneyTransfer Context", function() {
@@ -124,9 +160,9 @@
         __extends(MoneyTransfer, _super);
 
         function MoneyTransfer(source, destination, amount) {
-          this.bind(source).to(this.source);
-          this.bind(destination).to(this.destination);
-          this.bind(amount).to(this.amount);
+          this.bind(source).to('source');
+          this.bind(destination).to('destination');
+          this.bind(amount).to('amount');
         }
 
         MoneyTransfer.prototype.source = {
@@ -175,8 +211,8 @@
         __extends(Restaurant, _super);
 
         function Restaurant(guests, waiter) {
-          this.bind(guests).to(this.guests);
-          this.bind(waiter).to(this.waiter);
+          this.bind(guests).to('guests');
+          this.bind(waiter).to('waiter');
         }
 
         Restaurant.prototype.waiter = {
@@ -235,7 +271,7 @@
         __extends(LogAccount, _super);
 
         function LogAccount(account) {
-          this.bind(account).to(this.account);
+          this.bind(account).to('account');
         }
 
         LogAccount.prototype.account = {
@@ -290,8 +326,8 @@
         __extends(Game, _super);
 
         function Game(player) {
-          this.bind(player).to(this.player);
-          this.bind(player).to(this.judge);
+          this.bind(player).to('player');
+          this.bind(player).to('judge');
         }
 
         Game.prototype.player = {
@@ -360,8 +396,8 @@
             if (object == null) {
               object = {};
             }
-            this.bind(object).to(this.source);
-            this.bind(object).to(this.target);
+            this.bind(object).to('source');
+            this.bind(object).to('target');
           }
 
           ConflictRoleMethodNames.prototype.source = {
@@ -395,8 +431,8 @@
         __extends(C1, _super);
 
         function C1(o) {
-          this.bind(o).to(this.R1);
-          this.bind("C1").to(this.name);
+          this.bind(o).to('R1');
+          this.bind("C1").to('name');
         }
 
         C1.prototype.R1 = {
@@ -423,8 +459,8 @@
         __extends(C2, _super);
 
         function C2(o) {
-          this.bind(o).to(this.R2);
-          this.bind("C2").to(this.name);
+          this.bind(o).to('R2');
+          this.bind("C2").to('name');
         }
 
         C2.prototype.R2 = {
@@ -459,7 +495,7 @@
         __extends(MethodScopeTest, _super);
 
         function MethodScopeTest(o) {
-          this.bind(o).to(this.test);
+          this.bind(o).to('test');
         }
 
         MethodScopeTest.prototype.test = {
@@ -500,7 +536,7 @@
         __extends(Async, _super);
 
         function Async(o) {
-          this.bind(o).to(this.ajax);
+          this.bind(o).to('ajax');
         }
 
         Async.prototype.ajax = {
@@ -594,7 +630,7 @@
         __extends(SuperMan, _super);
 
         function SuperMan(man) {
-          this.bind(man).to(this.superman);
+          this.bind(man).to('superman');
         }
 
         SuperMan.prototype.superman = {

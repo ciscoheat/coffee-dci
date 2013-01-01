@@ -2,7 +2,7 @@ describe "Ivento.Dci.Context", ->
 
 	class Account extends Ivento.Dci.Context
 		constructor: (entries = []) ->
-			@bind(entries).to(@ledgers)
+			@bind(entries).to('ledgers')
 
 		# ===== Roles =====
 
@@ -30,7 +30,7 @@ describe "Ivento.Dci.Context", ->
 	class SimplerAccount
 		constructor: (entriesArray) ->
 			# Binding using the static method.
-			Ivento.Dci.Context.bind(@, entries: entriesArray).to(@ledgers)
+			Ivento.Dci.Context.bind(@, entries: entriesArray).to('ledgers')
 
 		# ===== Roles =====
 
@@ -87,13 +87,32 @@ describe "Ivento.Dci.Context", ->
 			simple = new SimplerAccount entries
 			expect(simple.balance()).toEqual(1100)
 
+		it "should throw an exception if the Role name isn't found in the Context", ->
+			
+			class NoRoleFound extends Ivento.Dci.Context
+				constructor: () ->
+					@bind(123).to('nonExistentRole')
+
+			expect(-> new NoRoleFound).toThrow("Role 'nonExistentRole' not found in Context.")
+
+		it "should throw an exception if the Role isn't bound as a string", ->
+			
+			class NoStringBinding extends Ivento.Dci.Context
+				constructor: () ->
+					@bind(123).to(@role)
+
+				role:
+					{}
+
+			expect(-> new NoStringBinding).toThrow("A Role must be bound as a string literal.")
+
 	describe "MoneyTransfer Context", ->
 		
 		class MoneyTransfer extends Ivento.Dci.Context
 			constructor: (source, destination, amount) ->
-				@bind(source).to(@source)
-				@bind(destination).to(@destination)
-				@bind(amount).to(@amount)
+				@bind(source).to('source')
+				@bind(destination).to('destination')
+				@bind(amount).to('amount')
 
 			# ===== Roles =====
 
@@ -140,8 +159,8 @@ describe "Ivento.Dci.Context", ->
 
 		class Restaurant extends Ivento.Dci.Context
 			constructor: (guests, waiter) ->
-				@bind(guests).to(@guests)
-				@bind(waiter).to(@waiter)
+				@bind(guests).to('guests')
+				@bind(waiter).to('waiter')
 
 			waiter:
 				_contract: ['name']
@@ -183,7 +202,7 @@ describe "Ivento.Dci.Context", ->
 
 		class LogAccount extends Ivento.Dci.Context
 			constructor: (account) ->
-				@bind(account).to(@account)
+				@bind(account).to('account')
 
 			account:
 				_contract: ['save', 'write']
@@ -212,8 +231,8 @@ describe "Ivento.Dci.Context", ->
 
 		class Game extends Ivento.Dci.Context
 			constructor: (player) ->
-				@bind(player).to(@player)
-				@bind(player).to(@judge)
+				@bind(player).to('player')
+				@bind(player).to('judge')
 
 			player:
 				_contract: ['bar']
@@ -267,8 +286,8 @@ describe "Ivento.Dci.Context", ->
 
 			class ConflictRoleMethodNames extends Ivento.Dci.Context
 				constructor: (object = {}) ->
-					@bind(object).to(@source)
-					@bind(object).to(@target)
+					@bind(object).to('source')
+					@bind(object).to('target')
 
 				source:
 					foo: () -> "source"
@@ -285,8 +304,8 @@ describe "Ivento.Dci.Context", ->
 		
 		class C1 extends Ivento.Dci.Context
 			constructor: (o) ->
-				@bind(o).to(@R1)
-				@bind("C1").to(@name)
+				@bind(o).to('R1')
+				@bind("C1").to('name')
 
 			# Role for testing object identity and context access
 			R1:
@@ -311,8 +330,8 @@ describe "Ivento.Dci.Context", ->
 
 		class C2 extends Ivento.Dci.Context
 			constructor: (o) ->
-				@bind(o).to(@R2)
-				@bind("C2").to(@name)
+				@bind(o).to('R2')
+				@bind("C2").to('name')
 
 			# Role for testing object identity and context access in a nested context
 			R2:
@@ -334,7 +353,7 @@ describe "Ivento.Dci.Context", ->
 
 		class MethodScopeTest extends Ivento.Dci.Context
 			constructor: (o) ->
-				@bind(o).to(@test)
+				@bind(o).to('test')
     
 			test:
 				inside: () -> 
@@ -359,7 +378,7 @@ describe "Ivento.Dci.Context", ->
 
 		class Async extends Ivento.Dci.Context
 			constructor: (o) ->
-				@bind(o).to(@ajax)
+				@bind(o).to('ajax')
 
 			ajax:
 				_contract: ['output']
@@ -435,7 +454,7 @@ describe "Ivento.Dci.Context", ->
 
 		class SuperMan extends Ivento.Dci.Context
 			constructor: (man) ->
-				@bind(man).to(@superman)
+				@bind(man).to('superman')
 
 			superman:
 				useXRay: () -> "wzzzt!"
