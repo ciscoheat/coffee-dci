@@ -3,94 +3,132 @@
     __extends = function(child, parent) { for (var key in parent) { if (__hasProp.call(parent, key)) child[key] = parent[key]; } function ctor() { this.constructor = child; } ctor.prototype = parent.prototype; child.prototype = new ctor(); child.__super__ = parent.prototype; return child; };
 
   describe("Ivento.Dci.Examples.Dijkstra", function() {
-    var ShortestPath;
-    ShortestPath = (function(_super) {
+    var ShortestManhattanPath;
+    ShortestManhattanPath = (function(_super) {
 
-      __extends(ShortestPath, _super);
+      __extends(ShortestManhattanPath, _super);
 
-      ShortestPath.prototype._tentativeDistances = new Hashtable();
+      ShortestManhattanPath.prototype._tentativeDistances = new Hashtable();
 
-      ShortestPath.prototype._distances = new Hashtable();
+      ShortestManhattanPath.prototype._distances = new Hashtable();
 
-      ShortestPath.prototype._unvisited = new Hashtable();
+      ShortestManhattanPath.prototype._unvisited = new Hashtable();
 
-      ShortestPath.prototype._smallestDistance = new Hashtable();
+      ShortestManhattanPath.prototype._pathTo = new Hashtable();
 
-      function ShortestPath(nodes, initialNode) {
-        var dist, from, node, to, _i, _len;
+      ShortestManhattanPath.prototype._initialNode = null;
+
+      function ShortestManhattanPath(nodes, initialNode) {
+        var convertNode, current, node, _i, _len;
+        convertNode = function(n) {
+          return {
+            node: n != null ? n[0] : null,
+            distance: n != null ? n[1] : null
+          };
+        };
         for (_i = 0, _len = nodes.length; _i < _len; _i++) {
           node = nodes[_i];
-          from = node[0];
-          to = node[1];
-          dist = node[2];
-          if (!this._tentativeDistances.containsKey(from)) {
-            this._tentativeDistances.put(from, Infinity);
+          current = node[0];
+          this._distances.put(current, {
+            east: convertNode(node[1]),
+            south: convertNode(node[2])
+          });
+          this._tentativeDistances.put(current, current === initialNode ? 0 : Infinity);
+          if (current !== initialNode) {
+            this._unvisited.put(current, true);
           }
-          if (!this._tentativeDistances.containsKey(to)) {
-            this._tentativeDistances.put(to, Infinity);
-          }
-          if (!this._distances.containsKey(from)) {
-            this._distances.put(from, new Hashtable());
-          }
-          this._distances.get(from).put(to, dist);
         }
-        this._tentativeDistances.put(initialNode, 0);
-        this._unvisited = this._tentativeDistances.clone();
-        this._unvisited.remove(initialNode);
-        this._bindRoles(initialNode, this._unvisited, this._tentativeDistances);
+        this._initialNode = initialNode;
+        this._rebind(initialNode);
+        this.bind(this._unvisited).to('unvisitedSet');
+        this.bind(this._tentativeDistances).to('tentativeDistances');
+        this.bind(this._pathTo).to('bestPath');
       }
 
-      ShortestPath.prototype._bindRoles = function(currentNode, unvisitedSet, tentativeDistances) {
-        this.bind(currentNode).to(this.currentNode);
-        this.bind(unvisitedSet).to(this.unvisitedSet);
-        return this.bind(tentativeDistances).to(this.tentativeDistances);
+      ShortestManhattanPath.prototype._rebind = function(newNode) {
+        var distance;
+        this.bind(newNode).to('currentNode');
+        this.bind(newNode).to('currentIntersection');
+        distance = this._distances.get(newNode);
+        this.bind(distance).to('edge');
+        this.bind(distance.east.node).to('eastNeighbor');
+        return this.bind(distance.south.node).to('southNeighbor');
       };
 
-      ShortestPath.prototype.tentativeDistances = {
+      ShortestManhattanPath.prototype.tentativeDistances = {
         _contract: ['get', 'put'],
-        distance: function(node) {
+        distanceTo: function(node) {
           return this.get(node);
         },
-        setDistance: function(node, distance) {
+        set: function(node, distance) {
           return this.put(node, distance);
         }
       };
 
-      ShortestPath.prototype.currentNode = {
-        unvisitedNeighbors: function() {
-          var neighbors;
-          neighbors = this.context._distances.get(this);
-          if (neighbors != null) {
-            return neighbors.keys();
-          } else {
-            return [];
+      ShortestManhattanPath.prototype.bestPath = {
+        _contract: ['get', 'put'],
+        fromStartTo: function(destination) {
+          var output;
+          output = [destination];
+          while (output[0] !== this.context._initialNode) {
+            output.unshift(this.get(output[0]));
           }
-        },
-        tentativeDistance: function() {
-          return this.context.tentativeDistances.get(this);
-        },
-        edgeDistance: function(neighbor) {
-          return this.context._distances.get(this).get(neighbor);
-        },
-        hasSmallestEdgeDistanceTo: function(node) {
-          return this.context._smallestDistance.put(node, this);
+          return output;
         }
       };
 
-      ShortestPath.prototype.unvisitedSet = {
-        _contract: ['remove'],
+      ShortestManhattanPath.prototype.currentIntersection = {
+        unvisitedNeighbors: function() {
+          var output;
+          output = [];
+          if (this.context.eastNeighbor != null) {
+            output.push(this.context.eastNeighbor);
+          }
+          if (this.context.southNeighbor != null) {
+            output.push(this.context.southNeighbor);
+          }
+          return output;
+        }
+      };
+
+      ShortestManhattanPath.prototype.edge = {
+        _contract: ['east', 'south']
+      };
+
+      ShortestManhattanPath.prototype.currentNode = {
+        tentativeDistance: function() {
+          return this.context.tentativeDistances.get(this);
+        },
+        edgeDistanceTo: function(neighbor) {
+          if (neighbor === this.context.eastNeighbor) {
+            return this.context.edge.east.distance;
+          }
+          if (neighbor === this.context.southNeighbor) {
+            return this.context.edge.south.distance;
+          }
+        },
+        hasSmallestEdgeDistanceTo: function(neighbor) {
+          return this.context.bestPath.put(neighbor, this);
+        }
+      };
+
+      ShortestManhattanPath.prototype.eastNeighbor = {};
+
+      ShortestManhattanPath.prototype.southNeighbor = {};
+
+      ShortestManhattanPath.prototype.unvisitedSet = {
+        _contract: ['remove', 'containsKey'],
         smallestTentativeDistanceNode: function() {
           var output, outputDistance,
             _this = this;
           outputDistance = Infinity;
           output = null;
           this.context.tentativeDistances.each(function(node, distance) {
-            var dist;
             if (!_this.containsKey(node)) {
               return;
             }
             if (output === null || distance < outputDistance) {
-              dist = distance;
+              outputDistance = distance;
               return output = node;
             }
           });
@@ -98,32 +136,32 @@
         }
       };
 
-      ShortestPath.prototype.to = function(destinationNode) {
+      ShortestManhattanPath.prototype.to = function(destinationNode) {
         var distance, neighbor, nextNode, _i, _len, _ref;
-        _ref = this.currentNode.unvisitedNeighbors();
+        _ref = this.currentIntersection.unvisitedNeighbors();
         for (_i = 0, _len = _ref.length; _i < _len; _i++) {
           neighbor = _ref[_i];
-          distance = this.currentNode.tentativeDistance() + this.currentNode.edgeDistance(neighbor);
-          if (distance < this.tentativeDistances.distance(neighbor)) {
-            this.tentativeDistances.setDistance(neighbor, distance);
+          distance = this.currentNode.tentativeDistance() + this.currentNode.edgeDistanceTo(neighbor);
+          if (distance < this.tentativeDistances.distanceTo(neighbor)) {
+            this.tentativeDistances.set(neighbor, distance);
             this.currentNode.hasSmallestEdgeDistanceTo(neighbor);
           }
         }
         this.unvisitedSet.remove(this.currentNode);
-        nextNode = this.unvisitedSet.smallestTentativeDistanceNode();
-        if (nextNode === destinationNode) {
-          return this._smallestDistance;
+        if (this.currentNode === destinationNode) {
+          return this.bestPath.fromStartTo(destinationNode);
         }
-        this._bindRoles(nextNode, this.unvisitedSet, this.tentativeDistances);
+        nextNode = this.unvisitedSet.smallestTentativeDistanceNode();
+        this._rebind(nextNode);
         return this.to(destinationNode);
       };
 
-      return ShortestPath;
+      return ShortestManhattanPath;
 
     })(Ivento.Dci.Context);
     return describe("Using Dijkstras algorithm", function() {
       return it("should find the shortest path from a to i", function() {
-        var a, b, c, d, e, f, from, g, h, i, nodes, output, path, to;
+        var a, b, c, d, e, f, g, h, i, nodes, output;
         a = new String('a');
         b = new String('b');
         c = new String('c');
@@ -133,7 +171,7 @@
         g = new String('g');
         h = new String('h');
         i = new String('i');
-        nodes = [[a, b, 2], [a, d, 1], [b, c, 3], [b, e, 2], [c, f, 1], [d, e, 1], [d, g, 2], [e, f, 1], [f, i, 4], [g, h, 1], [h, i, 2]];
+        nodes = [[a, [b, 2], [d, 1]], [b, [c, 3], [e, 2]], [c, null, [f, 1]], [d, [e, 1], [g, 2]], [e, [f, 1], null], [f, null, [i, 4]], [g, [h, 1], null], [h, [i, 2], null], [i, null, null]];
         /*
         			a - 2 - b - 3 - c
         			|       |       |
@@ -146,13 +184,7 @@
         			g - 1 - h - 2 - i
         */
 
-        from = a;
-        to = i;
-        path = new ShortestPath(nodes, from).to(to);
-        output = [to];
-        while (output[0] !== from) {
-          output.unshift(path.get(output[0]));
-        }
+        output = new ShortestManhattanPath(nodes, a).to(i);
         return expect(output.join(" -> ")).toEqual("a -> d -> g -> h -> i");
       });
     });
