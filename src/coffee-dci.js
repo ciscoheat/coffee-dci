@@ -68,7 +68,10 @@
         var binding, createRoleMethod, player, prop, roleMethod, _ref;
         binding = bindingFor(roleName);
         player = binding.__rolePlayer;
-        createRoleMethod = function(prop, roleMethod, objectMethod) {
+        createRoleMethod = function(prop) {
+          var objectMethod, roleMethod;
+          objectMethod = player[prop];
+          roleMethod = context.constructor.prototype[roleName][prop];
           if ((objectMethod != null) && !(roleMethod != null)) {
             return objectMethod;
           }
@@ -99,7 +102,7 @@
           for (prop in _ref) {
             roleMethod = _ref[prop];
             if (Context._isRoleMethod(prop, roleMethod)) {
-              player[prop] = createRoleMethod(prop, roleMethod, player[prop]);
+              player[prop] = createRoleMethod(prop);
             }
           }
           binding.__oldContext = player[binding.__contextProperty];

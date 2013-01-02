@@ -37,16 +37,21 @@ top.Ivento.Dci.Context = class Context
 			binding = bindingFor roleName
 			player = binding.__rolePlayer
 
-			createRoleMethod = (prop, roleMethod, objectMethod) ->
+			createRoleMethod = (prop) ->
+
+				objectMethod = player[prop]
+				roleMethod = context.constructor.prototype[roleName][prop]
+
 				# If only Object Method is available, nothing changes
 				return objectMethod if objectMethod? and not roleMethod?
 
 				throw "No Role method or Object method '" + prop + "' found." if not objectMethod? and not roleMethod?
 
+				# Set binding, if true then delete field on unbind, else restore old field.
 				if not objectMethod?
 					binding[prop] = true
 				else
-					binding[prop] = objectMethod
+					binding[prop] = objectMethod				
 
 				->
 					# If only Role Method is available, call it.						
@@ -67,7 +72,7 @@ top.Ivento.Dci.Context = class Context
 
 				# Create role methods and assign them to the RolePlayer
 				for prop, roleMethod of context.constructor.prototype[roleName] when Context._isRoleMethod prop, roleMethod
-					player[prop] = createRoleMethod prop, roleMethod, player[prop]
+					player[prop] = createRoleMethod prop
 
 				# Save previous properties
 				binding.__oldContext = player[binding.__contextProperty]
