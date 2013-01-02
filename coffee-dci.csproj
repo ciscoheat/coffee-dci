@@ -52,7 +52,9 @@
     <Content Include="tests\lib\jasmine-1.2.0\jasmine-html.js" />
     <Content Include="tests\lib\jasmine-1.2.0\jasmine.css" />
     <Content Include="tests\lib\jasmine-1.2.0\jasmine.js" />
+    <Content Include="tests\lib\jquery-1.8.1.min.js" />
     <Content Include="tests\lib\jshashtable_src.js" />
+    <Content Include="tests\lib\promise.min.js" />
     <Content Include="tests\SpecRunner.html" />
     <Content Include="tests\spec\context.js">
       <DependentUpon>context.coffee</DependentUpon>
