@@ -257,35 +257,28 @@
         name = null;
       }
       unbindMethods = function(role) {
-        var binding, contextProperty, field, oldContext, oldPromise, prop, rolePlayer;
+        var binding, contextProperty, field, prop, restore, rolePlayer;
         binding = Context._bindingFor(context, role);
         rolePlayer = binding.__rolePlayer;
         contextProperty = binding.__contextProperty;
         if (rolePlayer === null) {
           return;
         }
+        restore = function(obj, prop, oldValue, deleteField) {
+          if (oldValue === deleteField) {
+            return delete obj[prop];
+          } else {
+            return obj[prop] = oldValue;
+          }
+        };
         for (prop in binding) {
           field = binding[prop];
           if (prop[0] !== '_') {
-            if (field === true) {
-              delete rolePlayer[prop];
-            } else {
-              rolePlayer[prop] = field;
-            }
+            restore(rolePlayer, prop, field, true);
           }
         }
-        oldContext = binding.__oldContext;
-        if (oldContext === void 0) {
-          delete rolePlayer[contextProperty];
-        } else {
-          rolePlayer[contextProperty] = oldContext;
-        }
-        oldPromise = binding.__oldPromise;
-        if (oldPromise === void 0) {
-          delete rolePlayer.promise;
-        } else {
-          rolePlayer.promise = oldPromise;
-        }
+        restore(rolePlayer, contextProperty, binding.__oldContext);
+        restore(rolePlayer, 'promise', binding.__oldPromise);
         context.__isBound[role] = Context._defaultBinding(rolePlayer, contextProperty);
         return context[role] = {};
       };

@@ -207,25 +207,16 @@ top.Ivento.Dci.Context = class Context
 
 			return if rolePlayer is null
 
+			restore = (obj, prop, oldValue, deleteField) ->
+				if oldValue is deleteField then	delete obj[prop] else obj[prop] = oldValue
+
 			# Unbind Role Methods
 			for prop, field of binding when prop[0] isnt '_'
-				if field is true
-					delete rolePlayer[prop]
-				else
-					rolePlayer[prop] = field
+				restore rolePlayer, prop, field, true
 
 			# Unbind context and promise
-			oldContext = binding.__oldContext
-			if oldContext is undefined
-				delete rolePlayer[contextProperty]
-			else
-				rolePlayer[contextProperty] = oldContext
-
-			oldPromise = binding.__oldPromise
-			if oldPromise is undefined
-				delete rolePlayer.promise
-			else
-				rolePlayer.promise = oldPromise
+			restore rolePlayer, contextProperty, binding.__oldContext
+			restore rolePlayer, 'promise', binding.__oldPromise
 
 			context.__isBound[role] = Context._defaultBinding rolePlayer, contextProperty
 			context[role] = {}
