@@ -156,14 +156,20 @@ top.Ivento.Dci.Context = class Context
 
 			# Test if RolePlayer fulfills Role Contract
 			roleProto = context.constructor.prototype[role]
-			if roleProto._contract?
+			if rolePlayer isnt null and roleProto._contract?
 				for prop in roleProto._contract
-					throw "RolePlayer "+rolePlayer+" didn't fulfill Role Contract with property '"+prop+"'." if not (prop of rolePlayer)						
-
+					fields = prop.split "."
+					current = rolePlayer
+					while fields.length
+						current = current[fields.shift()]
+						if current is undefined
+							throw "RolePlayer "+rolePlayer+" didn't fulfill Role Contract with property '"+prop+"'." 
+						
 			# If rebinding roles, unbind the current.
 			prevBinding = bindingFor role
 			Context.unbind context, role if prevBinding? and prevBinding.__rolePlayer? and prevBinding.__rolePlayer isnt rolePlayer
 
+			# Setup the binding, for usage when executing a Context Method
 			context.__isBound[role] = Context._defaultBinding rolePlayer, contextProperty
 
 	@unbind: (context, name = null) ->

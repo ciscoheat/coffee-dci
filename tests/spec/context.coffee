@@ -106,6 +106,20 @@ describe "Ivento.Dci.Context", ->
 
 			expect(-> new NoStringBinding).toThrow("A Role must be bound as a string literal.")
 
+		it "should be allowed to bind null to a Role", ->
+			
+			class NullBind extends Ivento.Dci.Context
+				constructor: (o) ->
+					@bind(o).to('role')
+
+				role:
+					_contract: ['test']
+
+				test: () ->
+					@role
+
+			expect(new NullBind(null).test()).toBeNull()
+
 	describe "MoneyTransfer Context", ->
 		
 		class MoneyTransfer extends Ivento.Dci.Context
@@ -197,6 +211,22 @@ describe "Ivento.Dci.Context", ->
 			guests.remove = (g) -> delete @[g]
 
 			expect(() -> new Restaurant guests, anonymous).toThrow "RolePlayer [object Object] didn't fulfill Role Contract with property 'name'."
+
+		it "should throw an Exception if the RolePlayer doesn't have the nested properties specified in the _contract array", ->
+			
+			class NestedContract extends Ivento.Dci.Context
+				constructor: (node) ->
+					@bind(node).to('node')
+
+				node:
+					_contract: ['distance.from.east']
+
+			noGoodNode = distance: 123
+			goodNode = distance: from: east: 123
+
+			expect(-> new NestedContract noGoodNode).toThrow "RolePlayer [object Object] didn't fulfill Role Contract with property 'distance.from.east'."
+			expect(-> new NestedContract goodNode).not.toThrow()
+
 
 	describe "Role method accessing behavior for name conflicts", ->
 

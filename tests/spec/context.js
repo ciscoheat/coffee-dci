@@ -133,7 +133,7 @@
           return new NoRoleFound;
         }).toThrow("Role 'nonExistentRole' not found in Context.");
       });
-      return it("should throw an exception if the Role isn't bound as a string", function() {
+      it("should throw an exception if the Role isn't bound as a string", function() {
         var NoStringBinding;
         NoStringBinding = (function(_super) {
 
@@ -151,6 +151,29 @@
         return expect(function() {
           return new NoStringBinding;
         }).toThrow("A Role must be bound as a string literal.");
+      });
+      return it("should be allowed to bind null to a Role", function() {
+        var NullBind;
+        NullBind = (function(_super) {
+
+          __extends(NullBind, _super);
+
+          function NullBind(o) {
+            this.bind(o).to('role');
+          }
+
+          NullBind.prototype.role = {
+            _contract: ['test']
+          };
+
+          NullBind.prototype.test = function() {
+            return this.role;
+          };
+
+          return NullBind;
+
+        })(Ivento.Dci.Context);
+        return expect(new NullBind(null).test()).toBeNull();
       });
     });
     describe("MoneyTransfer Context", function() {
@@ -251,7 +274,7 @@
         expect(context.greet()).toEqual("Welcome, my name is Henry, I'll be your waiter tonight.");
         return expect(context.addGuest("Someone")).toEqual(1);
       });
-      return it("should throw an Exception if the RolePlayer doesn't have all the properties in the _contract array", function() {
+      it("should throw an Exception if the RolePlayer doesn't have all the properties in the _contract array", function() {
         var anonymous, guests;
         anonymous = {};
         guests = [];
@@ -262,6 +285,40 @@
         return expect(function() {
           return new Restaurant(guests, anonymous);
         }).toThrow("RolePlayer [object Object] didn't fulfill Role Contract with property 'name'.");
+      });
+      return it("should throw an Exception if the RolePlayer doesn't have the nested properties specified in the _contract array", function() {
+        var NestedContract, goodNode, noGoodNode;
+        NestedContract = (function(_super) {
+
+          __extends(NestedContract, _super);
+
+          function NestedContract(node) {
+            this.bind(node).to('node');
+          }
+
+          NestedContract.prototype.node = {
+            _contract: ['distance.from.east']
+          };
+
+          return NestedContract;
+
+        })(Ivento.Dci.Context);
+        noGoodNode = {
+          distance: 123
+        };
+        goodNode = {
+          distance: {
+            from: {
+              east: 123
+            }
+          }
+        };
+        expect(function() {
+          return new NestedContract(noGoodNode);
+        }).toThrow("RolePlayer [object Object] didn't fulfill Role Contract with property 'distance.from.east'.");
+        return expect(function() {
+          return new NestedContract(goodNode);
+        }).not.toThrow();
       });
     });
     describe("Role method accessing behavior for name conflicts", function() {

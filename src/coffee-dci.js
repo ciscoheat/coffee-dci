@@ -187,7 +187,7 @@
       }
       return {
         to: function(role, contextProperty) {
-          var prevBinding, roleProto, _i, _len, _ref;
+          var current, fields, prevBinding, roleProto, _i, _len, _ref;
           if (contextProperty == null) {
             contextProperty = 'context';
           }
@@ -198,12 +198,17 @@
             throw "Role '" + role + "' not found in Context.";
           }
           roleProto = context.constructor.prototype[role];
-          if (roleProto._contract != null) {
+          if (rolePlayer !== null && (roleProto._contract != null)) {
             _ref = roleProto._contract;
             for (_i = 0, _len = _ref.length; _i < _len; _i++) {
               prop = _ref[_i];
-              if (!(prop in rolePlayer)) {
-                throw "RolePlayer " + rolePlayer + " didn't fulfill Role Contract with property '" + prop + "'.";
+              fields = prop.split(".");
+              current = rolePlayer;
+              while (fields.length) {
+                current = current[fields.shift()];
+                if (current === void 0) {
+                  throw "RolePlayer " + rolePlayer + " didn't fulfill Role Contract with property '" + prop + "'.";
+                }
               }
             }
           }
