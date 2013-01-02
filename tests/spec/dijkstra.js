@@ -39,14 +39,14 @@
           }
         }
         this._initialNode = initialNode;
-        this._rebind(initialNode);
+        this._rebind(this._initialNode, this._unvisited, this._tentativeDistances, this._pathTo);
+      }
+
+      ShortestManhattanPath.prototype._rebind = function(newNode, unvisitedSet, tentativeDistances, bestPath) {
+        var distance;
         this.bind(this._unvisited).to('unvisitedSet');
         this.bind(this._tentativeDistances).to('tentativeDistances');
         this.bind(this._pathTo).to('bestPath');
-      }
-
-      ShortestManhattanPath.prototype._rebind = function(newNode) {
-        var distance;
         this.bind(newNode).to('currentNode');
         this.bind(newNode).to('currentIntersection');
         distance = this._distances.get(newNode);
@@ -92,7 +92,7 @@
       };
 
       ShortestManhattanPath.prototype.edge = {
-        _contract: ['east', 'south']
+        _contract: ['east.distance', 'south.distance']
       };
 
       ShortestManhattanPath.prototype.currentNode = {
@@ -101,20 +101,28 @@
         },
         edgeDistanceTo: function(neighbor) {
           if (neighbor === this.context.eastNeighbor) {
-            return this.context.edge.east.distance;
+            return this.context.eastNeighbor.eastNeighborDistance();
           }
           if (neighbor === this.context.southNeighbor) {
-            return this.context.edge.south.distance;
+            return this.context.southNeighbor.southNeighborDistance();
           }
         },
-        hasSmallestEdgeDistanceTo: function(neighbor) {
+        isSmallestEdgeDistanceTo: function(neighbor) {
           return this.context.bestPath.put(neighbor, this);
         }
       };
 
-      ShortestManhattanPath.prototype.eastNeighbor = {};
+      ShortestManhattanPath.prototype.eastNeighbor = {
+        eastNeighborDistance: function() {
+          return this.context.edge.east.distance;
+        }
+      };
 
-      ShortestManhattanPath.prototype.southNeighbor = {};
+      ShortestManhattanPath.prototype.southNeighbor = {
+        southNeighborDistance: function() {
+          return this.context.edge.south.distance;
+        }
+      };
 
       ShortestManhattanPath.prototype.unvisitedSet = {
         _contract: ['remove', 'containsKey'],
@@ -144,7 +152,7 @@
           distance = this.currentNode.tentativeDistance() + this.currentNode.edgeDistanceTo(neighbor);
           if (distance < this.tentativeDistances.distanceTo(neighbor)) {
             this.tentativeDistances.set(neighbor, distance);
-            this.currentNode.hasSmallestEdgeDistanceTo(neighbor);
+            this.currentNode.isSmallestEdgeDistanceTo(neighbor);
           }
         }
         this.unvisitedSet.remove(this.currentNode);
@@ -152,7 +160,7 @@
           return this.bestPath.fromStartTo(destinationNode);
         }
         nextNode = this.unvisitedSet.smallestTentativeDistanceNode();
-        this._rebind(nextNode);
+        this._rebind(nextNode, this._unvisited, this._tentativeDistances, this._pathTo);
         return this.to(destinationNode);
       };
 

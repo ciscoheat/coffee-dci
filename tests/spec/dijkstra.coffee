@@ -29,18 +29,20 @@ describe "Ivento.Dci.Examples.Dijkstra", ->
 				# Create a set of the unvisited nodes called the unvisited set 
 				# consisting of all the nodes except the initial node.
 				@_unvisited.put current, true if current isnt initialNode
-						
-			# Set the initial node as current
+									
 			@_initialNode = initialNode
 
 			# Bind roles
-			@_rebind initialNode
+			# Set the initial node as current
+			@_rebind @_initialNode, @_unvisited, @_tentativeDistances, @_pathTo
+
+		# For rebinding to next node that should be calculated
+		_rebind: (newNode, unvisitedSet, tentativeDistances, bestPath) ->
+
 			@bind(@_unvisited).to('unvisitedSet')
 			@bind(@_tentativeDistances).to('tentativeDistances')
 			@bind(@_pathTo).to('bestPath')
 
-		# For rebinding to next node that should be calculated
-		_rebind: (newNode) ->
 			@bind(newNode).to('currentNode')
 			@bind(newNode).to('currentIntersection')
 
@@ -77,24 +79,26 @@ describe "Ivento.Dci.Examples.Dijkstra", ->
 				output
 
 		edge:
-			_contract: ['east', 'south']
+			_contract: ['east.distance', 'south.distance']
 
 		currentNode:		
 			tentativeDistance: () ->
 				@context.tentativeDistances.get(@)
 				
 			edgeDistanceTo: (neighbor) ->
-				return @context.edge.east.distance if neighbor is @context.eastNeighbor
-				return @context.edge.south.distance if neighbor is @context.southNeighbor
+				return @context.eastNeighbor.eastNeighborDistance() if neighbor is @context.eastNeighbor
+				return @context.southNeighbor.southNeighborDistance() if neighbor is @context.southNeighbor
 
-			hasSmallestEdgeDistanceTo: (neighbor) ->
+			isSmallestEdgeDistanceTo: (neighbor) ->
 				@context.bestPath.put(neighbor, @)
 
 		eastNeighbor:
-			{}
+			eastNeighborDistance: () ->
+				@context.edge.east.distance
 
 		southNeighbor:
-			{}
+			southNeighborDistance: () ->
+				@context.edge.south.distance
 
 		unvisitedSet:
 			_contract: ['remove', 'containsKey']
@@ -111,7 +115,7 @@ describe "Ivento.Dci.Examples.Dijkstra", ->
 		
 				output
 
-		# ===== End roles =====
+		# ===== Interactions =====
 
 		to: (destinationNode) ->
 
@@ -126,7 +130,7 @@ describe "Ivento.Dci.Examples.Dijkstra", ->
 					@tentativeDistances.set neighbor, distance
 
 					# Store this as the best path to the neighbor
-					@currentNode.hasSmallestEdgeDistanceTo neighbor
+					@currentNode.isSmallestEdgeDistanceTo neighbor
 
 			# Mark the current node as visited and remove it from the unvisited set.
 			@unvisitedSet.remove @currentNode
@@ -139,7 +143,7 @@ describe "Ivento.Dci.Examples.Dijkstra", ->
 			nextNode = @unvisitedSet.smallestTentativeDistanceNode()
 
 			# Rebind the Context to the next node and calculate its distances.
-			@_rebind nextNode
+			@_rebind nextNode, @_unvisited, @_tentativeDistances, @_pathTo
 			@to destinationNode
 
 
