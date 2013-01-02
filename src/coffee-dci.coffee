@@ -14,9 +14,17 @@ top.Ivento.Dci.Context = class Context
 		Context.unbindPromise = settings.unbind
 		Context.isPromise = settings.identify
 
-	@promise: () -> new top.promise.Promise()
-	@unbindPromise: (p, f) -> p.then f
-	@isPromise: (p) -> p.then? and p.done?
+	@promiseJsAdapter:
+		factory: () -> new promise.Promise()
+		unbind: (p, f) -> p.then f
+		identify: (p) -> p.then? and p.done?
+
+	@jQueryAdapter:
+		factory: () -> jQuery.Deferred()
+		unbind: (p, f) -> p.always f
+		identify: (p) -> p.always? and p.done? and p.fail?
+
+	@setPromiseAdapter @promiseJsAdapter
 
 	@_isObject: (x) -> !!(x isnt null and typeof x is 'object')
 	@_isFunction: (x) -> !!(x && x.constructor && x.call && x.apply)
@@ -85,8 +93,7 @@ top.Ivento.Dci.Context = class Context
 			context[roleName] = player
 
 		doBindings = (contextMethodName) ->
-			for roleName of context.__isBound
-				doBinding contextMethodName, roleName
+			doBinding contextMethodName, roleName for roleName of context.__isBound
 
 		unbindContext = (context, oldPromise) ->
 			Context.unbind context

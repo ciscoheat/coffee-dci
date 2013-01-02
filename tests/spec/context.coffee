@@ -472,6 +472,37 @@ describe "Ivento.Dci.Context", ->
 			expect(o.get).toBeUndefined()
 			expect(o.output).toEqual("ReturnPromise")
 
+		it "should be able to change promise framework by using an adapter", ->
+			
+			Context = Ivento.Dci.Context
+
+			# Save old methods
+			promise = Context.promise
+			unbindPromise = Context.unbindPromise
+			isPromise = Context.isPromise
+
+			Context.setPromiseAdapter Context.jQueryAdapter
+
+			expect(Context.promise).toBe(Context.jQueryAdapter.factory)
+			expect(Context.unbindPromise).toBe(Context.jQueryAdapter.unbind)
+			expect(Context.isPromise).toBe(Context.jQueryAdapter.identify)
+
+			runs ->
+				a = new Async o
+				a.doItAsync()
+
+			waitsFor -> 
+				o.output.length > 5
+			, 
+				50
+
+			runs ->
+				expect(o.output).toEqual("AfterASYNC")
+				# Restore old promise functionality
+				Context.promise = promise
+				Context.unbindPromise = unbindPromise
+				Context.isPromise = isPromise
+
 	describe "Unbinding behavior", ->
 		
 		man = null

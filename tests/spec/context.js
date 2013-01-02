@@ -659,7 +659,7 @@
           return expect(o.output).toEqual("AfterASYNC");
         });
       });
-      return it("should not unbind the Context Methods if a promise is returned and not completed", function() {
+      it("should not unbind the Context Methods if a promise is returned and not completed", function() {
         var a, p;
         a = new Async(o);
         p = a.returnPromise();
@@ -668,6 +668,31 @@
         p.done();
         expect(o.get).toBeUndefined();
         return expect(o.output).toEqual("ReturnPromise");
+      });
+      return it("should be able to change promise framework by using an adapter", function() {
+        var Context, isPromise, promise, unbindPromise;
+        Context = Ivento.Dci.Context;
+        promise = Context.promise;
+        unbindPromise = Context.unbindPromise;
+        isPromise = Context.isPromise;
+        Context.setPromiseAdapter(Context.jQueryAdapter);
+        expect(Context.promise).toBe(Context.jQueryAdapter.factory);
+        expect(Context.unbindPromise).toBe(Context.jQueryAdapter.unbind);
+        expect(Context.isPromise).toBe(Context.jQueryAdapter.identify);
+        runs(function() {
+          var a;
+          a = new Async(o);
+          return a.doItAsync();
+        });
+        waitsFor(function() {
+          return o.output.length > 5;
+        }, 50);
+        return runs(function() {
+          expect(o.output).toEqual("AfterASYNC");
+          Context.promise = promise;
+          Context.unbindPromise = unbindPromise;
+          return Context.isPromise = isPromise;
+        });
       });
     });
     return describe("Unbinding behavior", function() {

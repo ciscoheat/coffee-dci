@@ -28,17 +28,31 @@
       return Context.isPromise = settings.identify;
     };
 
-    Context.promise = function() {
-      return new top.promise.Promise();
+    Context.promiseJsAdapter = {
+      factory: function() {
+        return new promise.Promise();
+      },
+      unbind: function(p, f) {
+        return p.then(f);
+      },
+      identify: function(p) {
+        return (p.then != null) && (p.done != null);
+      }
     };
 
-    Context.unbindPromise = function(p, f) {
-      return p.then(f);
+    Context.jQueryAdapter = {
+      factory: function() {
+        return jQuery.Deferred();
+      },
+      unbind: function(p, f) {
+        return p.always(f);
+      },
+      identify: function(p) {
+        return (p.always != null) && (p.done != null) && (p.fail != null);
+      }
     };
 
-    Context.isPromise = function(p) {
-      return (p.then != null) && (p.done != null);
-    };
+    Context.setPromiseAdapter(Context.promiseJsAdapter);
 
     Context._isObject = function(x) {
       return !!(x !== null && typeof x === 'object');
