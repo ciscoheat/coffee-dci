@@ -622,7 +622,11 @@
             if (!(_this.promise != null)) {
               throw "Promise should be defined";
             }
-            return _this.promise.done();
+            if (_this.promise.always != null) {
+              return _this.promise.resolve();
+            } else {
+              return _this.promise.done();
+            }
           });
           this.afterAsync();
           return this.promise;
@@ -635,6 +639,16 @@
             return _this.ajax.addOutput("Promise");
           });
           return this.promise;
+        };
+
+        Async.prototype.customPromise = function() {
+          var p,
+            _this = this;
+          p = jQuery.Deferred();
+          p.then(function() {
+            return _this.ajax.addOutput("CustomPromise");
+          });
+          return p;
         };
 
         return Async;
@@ -665,9 +679,30 @@
         p = a.returnPromise();
         expect(o.output).toEqual("Return");
         expect(o.get).toBeDefined();
-        p.done();
-        expect(o.get).toBeUndefined();
-        return expect(o.output).toEqual("ReturnPromise");
+        runs(function() {
+          return p.resolve();
+        });
+        waitsFor(function() {
+          return o.output === "ReturnPromise";
+        });
+        return runs(function() {
+          return expect(o.get).toBeUndefined();
+        });
+      });
+      it("should not unbind the Context Methods if a custome promise is returned and not completed", function() {
+        var a, p;
+        a = new Async(o);
+        p = a.customPromise();
+        expect(o.get).toBeDefined();
+        runs(function() {
+          return p.resolve();
+        });
+        waitsFor(function() {
+          return o.output === "CustomPromise";
+        });
+        return runs(function() {
+          return expect(o.get).toBeUndefined();
+        });
       });
       return it("should be able to change promise framework by using an adapter", function() {
         var Context, isPromise, promise, unbindPromise;
@@ -675,10 +710,13 @@
         promise = Context.promise;
         unbindPromise = Context.unbindPromise;
         isPromise = Context.isPromise;
-        Context.setPromiseAdapter(Context.jQueryAdapter);
-        expect(Context.promise).toBe(Context.jQueryAdapter.factory);
-        expect(Context.unbindPromise).toBe(Context.jQueryAdapter.unbind);
-        expect(Context.isPromise).toBe(Context.jQueryAdapter.identify);
+        expect(Context.promise).not.toBe(Context.promiseJsAdapter.factory);
+        expect(Context.unbindPromise).not.toBe(Context.promiseJsAdapter.unbind);
+        expect(Context.isPromise).not.toBe(Context.promiseJsAdapter.identify);
+        Context.setPromiseAdapter(Context.promiseJsAdapter);
+        expect(Context.promise).toBe(Context.promiseJsAdapter.factory);
+        expect(Context.unbindPromise).toBe(Context.promiseJsAdapter.unbind);
+        expect(Context.isPromise).toBe(Context.promiseJsAdapter.identify);
         runs(function() {
           var a;
           a = new Async(o);

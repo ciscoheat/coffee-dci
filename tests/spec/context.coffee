@@ -430,15 +430,28 @@ describe "Ivento.Dci.Context", ->
 			doItAsync: () ->
 				@ajax.get () => 
 					throw "Promise should be defined" if not @promise?
-					@promise.done()
+					# Little hack to determine if jQuery or promiseJS
+					if @promise.always? then @promise.resolve() else @promise.done()
 
 				@afterAsync()
 				@promise
 
 			returnPromise: () ->
 				@ajax.output += "Return"
-				@promise.then => @ajax.addOutput "Promise"
+
+				@promise.then => 
+					@ajax.addOutput "Promise"
+
 				@promise
+
+			customPromise: () ->
+				# Don't use the promise in the Context
+				p = jQuery.Deferred()
+
+				p.then =>
+					@ajax.addOutput "CustomPromise"
+
+				p
 
 		o = null
 
@@ -467,10 +480,31 @@ describe "Ivento.Dci.Context", ->
 			expect(o.output).toEqual("Return")
 			expect(o.get).toBeDefined()
 
-			p.done()
+			runs ->
+				# Using jQuery, which resolves using resolve()
+				p.resolve()
 
-			expect(o.get).toBeUndefined()
-			expect(o.output).toEqual("ReturnPromise")
+			waitsFor ->
+				o.output is "ReturnPromise"
+
+			runs ->
+				expect(o.get).toBeUndefined()
+
+		it "should not unbind the Context Methods if a custome promise is returned and not completed", ->
+			
+			a = new Async o
+			p = a.customPromise()
+
+			expect(o.get).toBeDefined()
+
+			runs ->	
+				p.resolve()
+
+			waitsFor ->
+				o.output is "CustomPromise"
+
+			runs ->
+				expect(o.get).toBeUndefined()
 
 		it "should be able to change promise framework by using an adapter", ->
 			
@@ -481,11 +515,15 @@ describe "Ivento.Dci.Context", ->
 			unbindPromise = Context.unbindPromise
 			isPromise = Context.isPromise
 
-			Context.setPromiseAdapter Context.jQueryAdapter
+			expect(Context.promise).not.toBe(Context.promiseJsAdapter.factory)
+			expect(Context.unbindPromise).not.toBe(Context.promiseJsAdapter.unbind)
+			expect(Context.isPromise).not.toBe(Context.promiseJsAdapter.identify)
 
-			expect(Context.promise).toBe(Context.jQueryAdapter.factory)
-			expect(Context.unbindPromise).toBe(Context.jQueryAdapter.unbind)
-			expect(Context.isPromise).toBe(Context.jQueryAdapter.identify)
+			Context.setPromiseAdapter Context.promiseJsAdapter
+
+			expect(Context.promise).toBe(Context.promiseJsAdapter.factory)
+			expect(Context.unbindPromise).toBe(Context.promiseJsAdapter.unbind)
+			expect(Context.isPromise).toBe(Context.promiseJsAdapter.identify)
 
 			runs ->
 				a = new Async o

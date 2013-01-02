@@ -9,10 +9,11 @@ top.Ivento.Dci.Context = class Context
 	bind: (rolePlayer) -> Context.bind @, rolePlayer
 	unbind: (name = null) -> Context.unbind @, name
 
-	@setPromiseAdapter: (settings) ->
-		Context.promise = settings.factory
-		Context.unbindPromise = settings.unbind
-		Context.isPromise = settings.identify
+	# Promise usage
+	#
+	# To use a custom promise framework, model an adapter
+	# object based on the following predefined ones, and pass 
+	# it to Context.setPromiseAdapter.
 
 	@promiseJsAdapter:
 		factory: () -> new promise.Promise()
@@ -24,7 +25,20 @@ top.Ivento.Dci.Context = class Context
 		unbind: (p, f) -> p.always f
 		identify: (p) -> p.always? and p.done? and p.fail?
 
-	@setPromiseAdapter @promiseJsAdapter
+	@setPromiseAdapter: (settings) ->
+		Context.promise = settings.factory
+		Context.unbindPromise = settings.unbind
+		Context.isPromise = settings.identify
+
+	@promise: () -> null
+	@unbindPromise: (p, f) ->
+	@isPromise: (p) -> false
+
+	# Auto-detect promise framework
+	if jQuery?
+		@setPromiseAdapter @jQueryAdapter
+	else if promise?
+		@setPromiseAdapter @promiseJsAdapter
 
 	@_isObject: (x) -> !!(x isnt null and typeof x is 'object')
 	@_isFunction: (x) -> !!(x && x.constructor && x.call && x.apply)
@@ -40,7 +54,7 @@ top.Ivento.Dci.Context = class Context
 
 		bindingFor = (roleName) -> Context._bindingFor context, roleName
 
-		doBinding = (contextMethodName, roleName) ->
+		doBinding = (roleName) ->
 
 			binding = bindingFor roleName
 			player = binding.__rolePlayer
@@ -87,43 +101,43 @@ top.Ivento.Dci.Context = class Context
 				binding.__oldPromise = player.promise
 
 				player[binding.__contextProperty] = context
-				player.promise = context[contextMethodName].__promise
+				player.promise = context.promise
 
 			# Assign RolePlayer to Role
 			context[roleName] = player
 
-		doBindings = (contextMethodName) ->
-			doBinding contextMethodName, roleName for roleName of context.__isBound
+		bindContext = () ->
+			# Save the old promise and create a new one
+			context.__oldPromise = context.promise
+			context.promise = Context.promise()
+
+			doBinding roleName for roleName of context.__isBound
 
 		unbindContext = (context, oldPromise) ->
 			Context.unbind context
 
-			if oldPromise is undefined
+			if not context.__oldPromise?
 				delete context.promise
 			else
-				context.promise = oldPromise
+				context.promise = context.__oldPromise
 
 		createContextMethod = (contextMethodName) ->
+			# Return a method that will execute the Context Method
 			-> 
-				oldPromise = context.promise
-
-				context[contextMethodName].__promise or= Context.promise()
-				context.promise = context[contextMethodName].__promise
-
-				doBindings contextMethodName
+				bindContext()
 
 				output = null
 				try
 					output = context.constructor.prototype[contextMethodName].apply context, arguments
 					output
 				finally
-					unbind = -> unbindContext context, oldPromise
+					unbindContextMethod = -> unbindContext context
 
 					# Test if result was asynchronous
 					if output? and Context.isPromise output
-						Context.unbindPromise(output, unbind)
+						Context.unbindPromise output, unbindContextMethod
 					else
-						unbind()
+						unbindContextMethod()
 
 
 		# Bind Context and Role methods to current context,
@@ -229,15 +243,3 @@ top.Ivento.Dci.Context = class Context
 		__oldContext: null
 		__oldPromise: null
 		__contextProperty: contextProperty
-
-# ===== PromiseJS ========================
-`
-/*
- *  Copyright 2012 (c) Pierre Duquesne <stackp@online.fr>
- *  Licensed under the New BSD License.
- *  https://github.com/stackp/promisejs
- */
-if(this.promise == null) {
-(function(a){function b(a,b){return function(){return a.apply(b,arguments);};}function c(){this._callbacks=[];}c.prototype.then=function(a,c){var d=b(a,c);if(this._isdone)d(this.error,this.result);else this._callbacks.push(d);};c.prototype.done=function(a,b){this._isdone=true;this.error=a;this.result=b;for(var c=0;c<this._callbacks.length;c++)this._callbacks[c](a,b);this._callbacks=[];};function d(a){var b=a.length;var d=0;var e=new c();var f=[];var g=[];function h(a){return function(c,h){d+=1;f[a]=c;g[a]=h;if(d===b)e.done(f,g);};}for(var i=0;i<b;i++)a[i]().then(h(i));return e;}function e(a,b,d){var f=new c();if(a.length===0)f.done(b,d);else a[0](b,d).then(function(b,c){a.splice(0,1);e(a,b,c).then(function(a,b){f.done(a,b);});});return f;}function f(a){var b="";if(typeof a==="string")b=a;else{var c=encodeURIComponent;for(var d in a)if(a.hasOwnProperty(d))b+='&'+c(d)+'='+c(a[d]);}return b;}function g(){var a;if(window.XMLHttpRequest)a=new XMLHttpRequest();else if(window.ActiveXObject)try{a=new ActiveXObject("Msxml2.XMLHTTP");}catch(b){a=new ActiveXObject("Microsoft.XMLHTTP");}return a;}function h(a,b,d,e){var h=new c();var i,j;d=d||{};e=e||{};try{i=g();}catch(k){h.done(-1,"");return h;}j=f(d);if(a==='GET'&&j){b+='?'+j;j=null;}i.open(a,b);i.setRequestHeader('Content-type','application/x-www-form-urlencoded');for(var l in e)if(e.hasOwnProperty(l))i.setRequestHeader(l,e[l]);i.onreadystatechange=function(){if(i.readyState===4)if(i.status===200)h.done(null,i.responseText);else h.done(i.status,"");};i.send(j);return h;}function i(a){return function(b,c,d){return h(a,b,c,d);};}var j={Promise:c,join:d,chain:e,ajax:h,get:i('GET'),post:i('POST'),put:i('PUT'),del:i('DELETE')};if(typeof define==='function'&&define.amd)define(function(){return j;});else a.promise=j;})(this);
-}
-`
