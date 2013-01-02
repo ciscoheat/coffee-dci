@@ -120,7 +120,7 @@ describe "Ivento.Dci.Context", ->
 
 			expect(new NullBind(null).test()).toBeNull()
 
-	describe "MoneyTransfer Context", ->
+	describe "MoneyTransfer with nested Contexts", ->
 		
 		class MoneyTransfer extends Ivento.Dci.Context
 			constructor: (source, destination, amount) ->

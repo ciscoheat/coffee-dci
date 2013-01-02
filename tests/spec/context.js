@@ -176,7 +176,7 @@
         return expect(new NullBind(null).test()).toBeNull();
       });
     });
-    describe("MoneyTransfer Context", function() {
+    describe("MoneyTransfer with nested Contexts", function() {
       var MoneyTransfer;
       MoneyTransfer = (function(_super) {
 
