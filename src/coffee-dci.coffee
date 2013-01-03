@@ -16,14 +16,18 @@ top.Ivento.Dci.Context = class Context
 	# it to Context.setPromiseAdapter.
 
 	@promiseJsAdapter:
+		# factory  : Return a new promise
 		factory: () -> new promise.Promise()
+		# unbind   : Add unbind function f to the promise for
+		#            execution when the promise is resolved.
 		unbind: (p, f) -> p.then f
-		identify: (p) -> p.then? and p.done?
+		# identify : For determining if the passed object is a promise.
+		identify: (o) -> o.then? and o.done?
 
 	@jQueryAdapter:
 		factory: () -> jQuery.Deferred()
 		unbind: (p, f) -> p.always f
-		identify: (p) -> p.always? and p.done? and p.fail?
+		identify: (o) -> o.always? and o.done? and o.fail?
 
 	@setPromiseAdapter: (settings) ->
 		Context.promise = settings.factory
@@ -32,18 +36,18 @@ top.Ivento.Dci.Context = class Context
 
 	@promise: () -> null
 	@unbindPromise: (p, f) ->
-	@isPromise: (p) -> false
+	@isPromise: (o) -> false
 
 	# Auto-detect promise framework
 	if jQuery?
-		@setPromiseAdapter @jQueryAdapter
+		Context.setPromiseAdapter Context.jQueryAdapter
 	else if promise?
-		@setPromiseAdapter @promiseJsAdapter
+		Context.setPromiseAdapter Context.promiseJsAdapter
 
 	@_isObject: (x) -> !!(x isnt null and typeof x is 'object')
 	@_isFunction: (x) -> !!(x && x.constructor && x.call && x.apply)
-	@_isRoleObject: (prop, field) -> prop[0] isnt '_' and @_isObject field
-	@_isRoleMethod: (prop, method) -> prop[0] isnt '_' and prop isnt 'constructor' and @._isFunction(method)
+	@_isRoleObject: (prop, field) -> prop[0] isnt '_' and Context._isObject field
+	@_isRoleMethod: (prop, method) -> prop[0] isnt '_' and prop isnt 'constructor' and Context._isFunction(method)
 
 	@bind: (context, rolePlayer) ->
 		
@@ -75,23 +79,21 @@ top.Ivento.Dci.Context = class Context
 				else
 					binding[prop] = objectMethod				
 
+				# Return a function that will call Role or Object method, depending on
+				# whether it's called from within the Context.
 				->
-					# If only Role Method is available, call it.						
+					# If only Role Method is available, call it.
 					return roleMethod.apply player, arguments if not objectMethod?
 
-					# If both Role and Object Method is available, determine if method was called
-					# from a Context, and call Role Method if so, if not call Object Method.
 					caller = arguments.callee.caller.__inContext
 					calledFromContext = caller is true or caller is roleName
 
 					if calledFromContext
 						return roleMethod.apply player, arguments
 					else
-						return objectMethod.apply player, arguments # rolePlayer or this?
+						return objectMethod.apply player, arguments
 
-			# Test if rolePlayer can be null, if not do property assignment.
 			if player isnt null
-
 				# Create role methods and assign them to the RolePlayer
 				for prop, roleMethod of context.constructor.prototype[roleName] when Context._isRoleMethod prop, roleMethod
 					player[prop] = createRoleMethod prop
@@ -122,7 +124,9 @@ top.Ivento.Dci.Context = class Context
 				context.promise = context.__oldPromise
 
 		createInteraction = (interactionName) ->
-			# Return a method that will execute the Context Method
+			# Return a method that will bind the Context, execute the Interaction
+			# and unbind the Context unless a promise was returned. If a promise
+			# is returned then unbinding will be done when it's resolved.
 			-> 
 				bindContext()
 				output = null
@@ -138,10 +142,9 @@ top.Ivento.Dci.Context = class Context
 						unbindContext()
 
 
-		# Bind Interactions and Role Methods to current context,
+		# Bind Interactions and Role Methods to the context prototype
 		# to determine if the Role or the Object method should be called.
 		proto = context.constructor.prototype
-
 		if not proto.__isProtoBound?
 			proto.__isProtoBound = true
 			roleMethods = {}
@@ -162,6 +165,7 @@ top.Ivento.Dci.Context = class Context
 						else
 							roleMethods[roleMethodName] = roleName + "." + roleMethodName
 
+		# Create Interactions for the context object, which are methods bound to the context.
 		if not context.__isBound?
 			context.__isBound = {}
 			proto = context.constructor.prototype
@@ -172,7 +176,7 @@ top.Ivento.Dci.Context = class Context
 					# Clear Roles before they are bound so they cannot be called before a Context Method.
 					context[prop] = {}
 
-		# Return the 'to' method to complete the binding.
+		# Return the 'to' method for completing the binding.
 		to: (role, contextProperty = 'context') ->
 
 			throw "A Role must be bound as a string literal." if not (typeof role is 'string')
@@ -190,22 +194,23 @@ top.Ivento.Dci.Context = class Context
 							throw "RolePlayer "+rolePlayer+" didn't fulfill Role Contract with property '"+prop+"'."
 						
 			# If rebinding roles, unbind the current.
-			prevBinding = bindingFor role
-			Context.unbind context, role if prevBinding?.__rolePlayer? and prevBinding.__rolePlayer isnt rolePlayer
+			currentBinding = bindingFor role
+			Context.unbind context, role if currentBinding?.__rolePlayer? and currentBinding.__rolePlayer isnt rolePlayer
 
-			# Setup the binding, for usage when executing a Context Method
+			# Setup the binding that will be bound when executing an Interaction.
 			context.__isBound[role] = Context._defaultBinding rolePlayer, contextProperty
 
 	@unbind: (context, name = null) ->
 		unbindRoleMethods = (role) ->
 
 			binding = Context._bindingFor context, role
+
+			return if binding.__rolePlayer is null
+
 			rolePlayer = binding.__rolePlayer
 			contextProperty = binding.__contextProperty
 
-			return if rolePlayer is null
-
-			restore = (obj, prop, oldValue, deleteField) ->
+			restore = (obj, prop, oldValue, deleteField = undefined) ->
 				if oldValue is deleteField then	delete obj[prop] else obj[prop] = oldValue
 
 			# Unbind Role Methods
@@ -216,6 +221,8 @@ top.Ivento.Dci.Context = class Context
 			restore rolePlayer, contextProperty, binding.__oldContext
 			restore rolePlayer, 'promise', binding.__oldPromise
 
+			# Note that only the Role methods are unbound,
+			# the binding itself stays so it can be rebound again when needed.
 			context.__isBound[role] = Context._defaultBinding rolePlayer, contextProperty
 			context[role] = {}
 		

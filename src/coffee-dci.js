@@ -29,8 +29,8 @@
       unbind: function(p, f) {
         return p.then(f);
       },
-      identify: function(p) {
-        return (p.then != null) && (p.done != null);
+      identify: function(o) {
+        return (o.then != null) && (o.done != null);
       }
     };
 
@@ -41,8 +41,8 @@
       unbind: function(p, f) {
         return p.always(f);
       },
-      identify: function(p) {
-        return (p.always != null) && (p.done != null) && (p.fail != null);
+      identify: function(o) {
+        return (o.always != null) && (o.done != null) && (o.fail != null);
       }
     };
 
@@ -58,7 +58,7 @@
 
     Context.unbindPromise = function(p, f) {};
 
-    Context.isPromise = function(p) {
+    Context.isPromise = function(o) {
       return false;
     };
 
@@ -77,11 +77,11 @@
     };
 
     Context._isRoleObject = function(prop, field) {
-      return prop[0] !== '_' && this._isObject(field);
+      return prop[0] !== '_' && Context._isObject(field);
     };
 
     Context._isRoleMethod = function(prop, method) {
-      return prop[0] !== '_' && prop !== 'constructor' && this._isFunction(method);
+      return prop[0] !== '_' && prop !== 'constructor' && Context._isFunction(method);
     };
 
     Context.bind = function(context, rolePlayer) {
@@ -214,7 +214,7 @@
       }
       return {
         to: function(role, contextProperty) {
-          var current, fields, prevBinding, roleProto, _i, _len, _ref;
+          var current, currentBinding, fields, roleProto, _i, _len, _ref;
           if (contextProperty == null) {
             contextProperty = 'context';
           }
@@ -239,8 +239,8 @@
               }
             }
           }
-          prevBinding = bindingFor(role);
-          if (((prevBinding != null ? prevBinding.__rolePlayer : void 0) != null) && prevBinding.__rolePlayer !== rolePlayer) {
+          currentBinding = bindingFor(role);
+          if (((currentBinding != null ? currentBinding.__rolePlayer : void 0) != null) && currentBinding.__rolePlayer !== rolePlayer) {
             Context.unbind(context, role);
           }
           return context.__isBound[role] = Context._defaultBinding(rolePlayer, contextProperty);
@@ -256,12 +256,15 @@
       unbindRoleMethods = function(role) {
         var binding, contextProperty, field, prop, restore, rolePlayer;
         binding = Context._bindingFor(context, role);
-        rolePlayer = binding.__rolePlayer;
-        contextProperty = binding.__contextProperty;
-        if (rolePlayer === null) {
+        if (binding.__rolePlayer === null) {
           return;
         }
+        rolePlayer = binding.__rolePlayer;
+        contextProperty = binding.__contextProperty;
         restore = function(obj, prop, oldValue, deleteField) {
+          if (deleteField == null) {
+            deleteField = void 0;
+          }
           if (oldValue === deleteField) {
             return delete obj[prop];
           } else {
