@@ -186,12 +186,16 @@ top.Ivento.Dci.Context = class Context
 			roleProto = context.constructor.prototype[role]
 			if rolePlayer isnt null and roleProto._contract?
 				for prop in roleProto._contract
-					fields = prop.split "."
-					current = rolePlayer
-					while fields.length
-						current = current[fields.shift()]
-						if current is undefined
-							throw "RolePlayer "+rolePlayer+" didn't fulfill Role Contract with property '"+prop+"'."
+					if prop is '()'
+						if not Context._isFunction rolePlayer
+							throw "RolePlayer "+rolePlayer+" didn't fulfill Role Contract: Not a function."
+					else
+						fields = prop.split "."
+						current = rolePlayer
+						while fields.length
+							current = current[fields.shift()]
+							if current is undefined
+								throw "RolePlayer "+rolePlayer+" didn't fulfill Role Contract with property '"+prop+"'."
 						
 			# If rebinding roles, unbind the current.
 			currentBinding = bindingFor role

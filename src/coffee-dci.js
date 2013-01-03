@@ -229,12 +229,18 @@
             _ref = roleProto._contract;
             for (_i = 0, _len = _ref.length; _i < _len; _i++) {
               prop = _ref[_i];
-              fields = prop.split(".");
-              current = rolePlayer;
-              while (fields.length) {
-                current = current[fields.shift()];
-                if (current === void 0) {
-                  throw "RolePlayer " + rolePlayer + " didn't fulfill Role Contract with property '" + prop + "'.";
+              if (prop === '()') {
+                if (!Context._isFunction(rolePlayer)) {
+                  throw "RolePlayer " + rolePlayer + " didn't fulfill Role Contract: Not a function.";
+                }
+              } else {
+                fields = prop.split(".");
+                current = rolePlayer;
+                while (fields.length) {
+                  current = current[fields.shift()];
+                  if (current === void 0) {
+                    throw "RolePlayer " + rolePlayer + " didn't fulfill Role Contract with property '" + prop + "'.";
+                  }
                 }
               }
             }

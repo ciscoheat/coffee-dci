@@ -274,7 +274,7 @@
         expect(context.greet()).toEqual("Welcome, my name is Henry, I'll be your waiter tonight.");
         return expect(context.addGuest("Someone")).toEqual(1);
       });
-      it("should throw an Exception if the RolePlayer doesn't have all the properties in the _contract array", function() {
+      it("should throw an Exception if the RolePlayer doesn't have all the properties specified in the contract", function() {
         var anonymous, guests;
         anonymous = {};
         guests = [];
@@ -286,7 +286,7 @@
           return new Restaurant(guests, anonymous);
         }).toThrow("RolePlayer [object Object] didn't fulfill Role Contract with property 'name'.");
       });
-      return it("should throw an Exception if the RolePlayer doesn't have the nested properties specified in the _contract array", function() {
+      it("should throw an Exception if the RolePlayer doesn't have the nested properties specified in the contract", function() {
         var NestedContract, goodNode, noGoodNode;
         NestedContract = (function(_super) {
 
@@ -318,6 +318,37 @@
         }).toThrow("RolePlayer [object Object] didn't fulfill Role Contract with property 'distance.from.east'.");
         return expect(function() {
           return new NestedContract(goodNode);
+        }).not.toThrow();
+      });
+      return it("should throw an Exception if the contract specifies that the RolePlayer should be a function and it's not.", function() {
+        var FunctionContract, test, test2;
+        FunctionContract = (function(_super) {
+
+          __extends(FunctionContract, _super);
+
+          function FunctionContract(o) {
+            this.bind(o).to('funcRole');
+          }
+
+          FunctionContract.prototype.funcRole = {
+            _contract: ['()', 'field']
+          };
+
+          return FunctionContract;
+
+        })(Ivento.Dci.Context);
+        test = {
+          field: "I'm a property"
+        };
+        test2 = function() {
+          return "I'm a function";
+        };
+        test2.field = "I'm a property";
+        expect(function() {
+          return new FunctionContract(test);
+        }).toThrow("RolePlayer [object Object] didn't fulfill Role Contract: Not a function.");
+        return expect(function() {
+          return new FunctionContract(test2);
         }).not.toThrow();
       });
     });

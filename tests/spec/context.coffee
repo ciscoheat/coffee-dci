@@ -203,7 +203,7 @@ describe "Ivento.Dci.Context", ->
 			expect(context.greet()).toEqual "Welcome, my name is Henry, I'll be your waiter tonight."
 			expect(context.addGuest "Someone").toEqual 1
 
-		it "should throw an Exception if the RolePlayer doesn't have all the properties in the _contract array", ->
+		it "should throw an Exception if the RolePlayer doesn't have all the properties specified in the contract", ->
 			anonymous = {}
 
 			guests = []
@@ -212,7 +212,7 @@ describe "Ivento.Dci.Context", ->
 
 			expect(() -> new Restaurant guests, anonymous).toThrow "RolePlayer [object Object] didn't fulfill Role Contract with property 'name'."
 
-		it "should throw an Exception if the RolePlayer doesn't have the nested properties specified in the _contract array", ->
+		it "should throw an Exception if the RolePlayer doesn't have the nested properties specified in the contract", ->
 			
 			class NestedContract extends Ivento.Dci.Context
 				constructor: (node) ->
@@ -227,6 +227,22 @@ describe "Ivento.Dci.Context", ->
 			expect(-> new NestedContract noGoodNode).toThrow "RolePlayer [object Object] didn't fulfill Role Contract with property 'distance.from.east'."
 			expect(-> new NestedContract goodNode).not.toThrow()
 
+		it "should throw an Exception if the contract specifies that the RolePlayer should be a function and it's not.", ->
+
+			class FunctionContract extends Ivento.Dci.Context
+				constructor: (o) ->
+					@bind(o).to('funcRole')
+
+				funcRole:
+					_contract: ['()', 'field']
+
+			test = field: "I'm a property"
+
+			test2 = () -> "I'm a function"
+			test2.field = "I'm a property"
+
+			expect(-> new FunctionContract test).toThrow "RolePlayer [object Object] didn't fulfill Role Contract: Not a function."
+			expect(-> new FunctionContract test2).not.toThrow()
 
 	describe "Role method accessing behavior for name conflicts", ->
 
