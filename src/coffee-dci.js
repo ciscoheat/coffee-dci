@@ -85,8 +85,8 @@
     };
 
     Context.bind = function(context, rolePlayer) {
-      var bindContext, bindingFor, createContextMethod, doBinding, field, isContextMethod, prop, proto, roleMethod, roleMethodName, roleMethods, roleName, unbindContext;
-      isContextMethod = function(prop) {
+      var bindContext, bindingFor, createInteraction, doBinding, field, isInteraction, prop, proto, roleMethod, roleMethodName, roleMethods, roleName, unbindContext;
+      isInteraction = function(prop) {
         return prop[0] !== '_' && !(prop === 'constructor' || prop === 'bind' || prop === 'unbind') && Context._isFunction(context[prop]);
       };
       bindingFor = function(roleName) {
@@ -150,7 +150,7 @@
         }
         return _results;
       };
-      unbindContext = function(context, oldPromise) {
+      unbindContext = function() {
         Context.unbind(context);
         if (!(context.__oldPromise != null)) {
           return delete context.promise;
@@ -158,22 +158,19 @@
           return context.promise = context.__oldPromise;
         }
       };
-      createContextMethod = function(contextMethodName) {
+      createInteraction = function(interactionName) {
         return function() {
-          var output, unbindContextMethod;
+          var output;
           bindContext();
           output = null;
           try {
-            output = context.constructor.prototype[contextMethodName].apply(context, arguments);
+            output = context.constructor.prototype[interactionName].apply(context, arguments);
             return output;
           } finally {
-            unbindContextMethod = function() {
-              return unbindContext(context);
-            };
             if ((output != null) && Context.isPromise(output)) {
-              Context.unbindPromise(output, unbindContextMethod);
+              Context.unbindPromise(output, unbindContext);
             } else {
-              unbindContextMethod();
+              unbindContext();
             }
           }
         };
@@ -184,7 +181,7 @@
         roleMethods = {};
         for (prop in proto) {
           field = proto[prop];
-          if (isContextMethod(prop)) {
+          if (isInteraction(prop)) {
             proto[prop].__inContext = true;
           } else if (Context._isRoleObject(prop, field)) {
             roleName = prop;
@@ -208,8 +205,8 @@
         proto = context.constructor.prototype;
         for (prop in proto) {
           field = proto[prop];
-          if (isContextMethod(prop)) {
-            context[prop] = createContextMethod(prop);
+          if (isInteraction(prop)) {
+            context[prop] = createInteraction(prop);
           } else if (Context._isRoleObject(prop, field)) {
             context[prop] = {};
           }
@@ -243,7 +240,7 @@
             }
           }
           prevBinding = bindingFor(role);
-          if ((prevBinding != null) && (prevBinding.__rolePlayer != null) && prevBinding.__rolePlayer !== rolePlayer) {
+          if (((prevBinding != null ? prevBinding.__rolePlayer : void 0) != null) && prevBinding.__rolePlayer !== rolePlayer) {
             Context.unbind(context, role);
           }
           return context.__isBound[role] = Context._defaultBinding(rolePlayer, contextProperty);
@@ -252,11 +249,11 @@
     };
 
     Context.unbind = function(context, name) {
-      var role, unbindMethods, _results;
+      var role, unbindRoleMethods, _results;
       if (name == null) {
         name = null;
       }
-      unbindMethods = function(role) {
+      unbindRoleMethods = function(role) {
         var binding, contextProperty, field, prop, restore, rolePlayer;
         binding = Context._bindingFor(context, role);
         rolePlayer = binding.__rolePlayer;
@@ -285,11 +282,11 @@
       if (!(name != null)) {
         _results = [];
         for (role in context.__isBound) {
-          _results.push(unbindMethods(role));
+          _results.push(unbindRoleMethods(role));
         }
         return _results;
       } else {
-        return unbindMethods(name);
+        return unbindRoleMethods(name);
       }
     };
 

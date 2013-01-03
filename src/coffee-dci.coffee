@@ -47,7 +47,7 @@ top.Ivento.Dci.Context = class Context
 
 	@bind: (context, rolePlayer) ->
 		
-		isContextMethod = (prop) -> 
+		isInteraction = (prop) -> 
 			prop[0] isnt '_' and 
 			not (prop in ['constructor', 'bind', 'unbind']) and 
 			Context._isFunction(context[prop])
@@ -113,7 +113,7 @@ top.Ivento.Dci.Context = class Context
 
 			doBinding roleName for roleName of context.__isBound
 
-		unbindContext = (context, oldPromise) ->
+		unbindContext = () ->
 			Context.unbind context
 
 			if not context.__oldPromise?
@@ -121,34 +121,32 @@ top.Ivento.Dci.Context = class Context
 			else
 				context.promise = context.__oldPromise
 
-		createContextMethod = (contextMethodName) ->
+		createInteraction = (interactionName) ->
 			# Return a method that will execute the Context Method
 			-> 
 				bindContext()
-
 				output = null
+
 				try
-					output = context.constructor.prototype[contextMethodName].apply context, arguments
+					output = context.constructor.prototype[interactionName].apply context, arguments
 					output
 				finally
-					unbindContextMethod = -> unbindContext context
-
 					# Test if result was asynchronous
 					if output? and Context.isPromise output
-						Context.unbindPromise output, unbindContextMethod
+						Context.unbindPromise output, unbindContext
 					else
-						unbindContextMethod()
+						unbindContext()
 
 
-		# Bind Context and Role methods to current context,
-		# to determine if the Context or the Object method should be called.
+		# Bind Interactions and Role Methods to current context,
+		# to determine if the Role or the Object method should be called.
 		proto = context.constructor.prototype
 
 		if not proto.__isProtoBound?
 			proto.__isProtoBound = true
 			roleMethods = {}
 			for prop, field of proto
-				if isContextMethod prop
+				if isInteraction prop
 					# Context methods should always use the Role Method (true)
 					proto[prop].__inContext = true
 				else if Context._isRoleObject prop, field
@@ -168,8 +166,8 @@ top.Ivento.Dci.Context = class Context
 			context.__isBound = {}
 			proto = context.constructor.prototype
 			for prop, field of proto 
-				if isContextMethod prop
-					context[prop] = createContextMethod prop
+				if isInteraction prop
+					context[prop] = createInteraction prop
 				else if Context._isRoleObject prop, field
 					# Clear Roles before they are bound so they cannot be called before a Context Method.
 					context[prop] = {}
@@ -189,17 +187,17 @@ top.Ivento.Dci.Context = class Context
 					while fields.length
 						current = current[fields.shift()]
 						if current is undefined
-							throw "RolePlayer "+rolePlayer+" didn't fulfill Role Contract with property '"+prop+"'." 
+							throw "RolePlayer "+rolePlayer+" didn't fulfill Role Contract with property '"+prop+"'."
 						
 			# If rebinding roles, unbind the current.
 			prevBinding = bindingFor role
-			Context.unbind context, role if prevBinding? and prevBinding.__rolePlayer? and prevBinding.__rolePlayer isnt rolePlayer
+			Context.unbind context, role if prevBinding?.__rolePlayer? and prevBinding.__rolePlayer isnt rolePlayer
 
 			# Setup the binding, for usage when executing a Context Method
 			context.__isBound[role] = Context._defaultBinding rolePlayer, contextProperty
 
 	@unbind: (context, name = null) ->
-		unbindMethods = (role) ->
+		unbindRoleMethods = (role) ->
 
 			binding = Context._bindingFor context, role
 			rolePlayer = binding.__rolePlayer
@@ -222,9 +220,9 @@ top.Ivento.Dci.Context = class Context
 			context[role] = {}
 		
 		if not name?
-			unbindMethods role for role of context.__isBound
+			unbindRoleMethods role for role of context.__isBound
 		else
-			unbindMethods name
+			unbindRoleMethods name
 
 	@_bindingFor: (context, role) ->
 		context.__isBound[role]
