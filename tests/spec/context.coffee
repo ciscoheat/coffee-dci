@@ -344,7 +344,21 @@ describe "Ivento.Dci.Context", ->
 				doIt: () ->
 					@source.foo() + @target.foo()
 
-			expect(-> new ConflictRoleMethodNames()).toThrow("Method name conflict in Roles 'source.foo' and 'target.foo'. Please prepend the Role names to the methods to avoid conflict.")
+			expect(-> new ConflictRoleMethodNames()).toThrow "Method name conflict in Roles 'source.foo' and 'target.foo'. Please prepend the Role names to the methods to avoid conflict."
+
+		it "should throw an exception if a reserved property is defined in the context", ->
+			
+			class ConflictContextProperties extends Ivento.Dci.Context
+				constructor: (o = {}) ->
+					@bind(o).to('role')
+
+				role:
+					{}
+
+				promise: () ->
+					"Reserved property."
+
+			expect(-> new ConflictContextProperties()).toThrow "Property 'promise' is reserved in a Context object."
 
 	describe "Context access from Role methods", ->
 		
@@ -604,9 +618,7 @@ describe "Ivento.Dci.Context", ->
 			superMan = new SuperMan man
 
 			expect(man.context).toBeUndefined()
-			expect(man.promise).toBeUndefined()
 
 			expect(superMan.execute()).toEqual("wheee!")
 
 			expect(man.context).toBeUndefined()
-			expect(man.promise).toBeUndefined()

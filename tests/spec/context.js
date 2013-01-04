@@ -474,7 +474,7 @@
         expect(dbAccount.logWritten).toBeTruthy();
         return expect(dbAccount.dbWritten).toBeTruthy();
       });
-      return it("should throw an exception if multiple roles have the same role method name", function() {
+      it("should throw an exception if multiple roles have the same role method name", function() {
         var ConflictRoleMethodNames;
         ConflictRoleMethodNames = (function(_super) {
 
@@ -510,6 +510,32 @@
         return expect(function() {
           return new ConflictRoleMethodNames();
         }).toThrow("Method name conflict in Roles 'source.foo' and 'target.foo'. Please prepend the Role names to the methods to avoid conflict.");
+      });
+      return it("should throw an exception if a reserved property is defined in the context", function() {
+        var ConflictContextProperties;
+        ConflictContextProperties = (function(_super) {
+
+          __extends(ConflictContextProperties, _super);
+
+          function ConflictContextProperties(o) {
+            if (o == null) {
+              o = {};
+            }
+            this.bind(o).to('role');
+          }
+
+          ConflictContextProperties.prototype.role = {};
+
+          ConflictContextProperties.prototype.promise = function() {
+            return "Reserved property.";
+          };
+
+          return ConflictContextProperties;
+
+        })(Ivento.Dci.Context);
+        return expect(function() {
+          return new ConflictContextProperties();
+        }).toThrow("Property 'promise' is reserved in a Context object.");
       });
     });
     describe("Context access from Role methods", function() {
@@ -818,10 +844,8 @@
       return it("should remove special properties from the rolePlayer automatically", function() {
         superMan = new SuperMan(man);
         expect(man.context).toBeUndefined();
-        expect(man.promise).toBeUndefined();
         expect(superMan.execute()).toEqual("wheee!");
-        expect(man.context).toBeUndefined();
-        return expect(man.promise).toBeUndefined();
+        return expect(man.context).toBeUndefined();
       });
     });
   });

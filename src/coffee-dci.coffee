@@ -49,11 +49,13 @@ top.Ivento.Dci.Context = class Context
 	@_isRoleObject: (prop, field) -> prop[0] isnt '_' and Context._isObject field
 	@_isRoleMethod: (prop, method) -> prop[0] isnt '_' and prop isnt 'constructor' and Context._isFunction(method)
 
+	@_reservedProperties: ['bind', 'unbind', 'promise']
+
 	@bind: (context, rolePlayer) ->
 		
 		isInteraction = (prop) -> 
-			prop[0] isnt '_' and 
-			not (prop in ['constructor', 'bind', 'unbind']) and 
+			prop[0] isnt '_' and prop isnt 'constructor' and
+			not (prop in Context._reservedProperties) and
 			Context._isFunction(context[prop])
 
 		bindingFor = (roleName) -> Context._bindingFor context, roleName
@@ -100,10 +102,7 @@ top.Ivento.Dci.Context = class Context
 
 				# Save previous properties
 				binding.__oldContext = player[binding.__contextProperty]
-				binding.__oldPromise = player.promise
-
 				player[binding.__contextProperty] = context
-				player.promise = context.promise
 
 			# Assign RolePlayer to Role
 			context[roleName] = player
@@ -113,7 +112,7 @@ top.Ivento.Dci.Context = class Context
 			context.__oldPromise = context.promise
 			context.promise = Context.promise()
 
-			doBinding roleName for roleName of context.__isBound
+			doBinding roleName for roleName of context.__bindings
 
 		unbindContext = () ->
 			Context.unbind context
@@ -149,6 +148,9 @@ top.Ivento.Dci.Context = class Context
 			proto.__isProtoBound = true
 			roleMethods = {}
 			for prop, field of proto
+				if proto.hasOwnProperty(prop) and prop in Context._reservedProperties
+					throw "Property '"+prop+"' is reserved in a Context object."
+
 				if isInteraction prop
 					# Context methods should always use the Role Method (true)
 					proto[prop].__inContext = true
@@ -166,8 +168,8 @@ top.Ivento.Dci.Context = class Context
 							roleMethods[roleMethodName] = roleName + "." + roleMethodName
 
 		# Create Interactions for the context object, which are methods bound to the context.
-		if not context.__isBound?
-			context.__isBound = {}
+		if not context.__bindings?
+			context.__bindings = {}
 			proto = context.constructor.prototype
 			for prop, field of proto 
 				if isInteraction prop
@@ -202,7 +204,7 @@ top.Ivento.Dci.Context = class Context
 			Context.unbind context, role if currentBinding?.__rolePlayer? and currentBinding.__rolePlayer isnt rolePlayer
 
 			# Setup the binding that will be bound when executing an Interaction.
-			context.__isBound[role] = Context._defaultBinding rolePlayer, contextProperty
+			context.__bindings[role] = Context._defaultBinding rolePlayer, contextProperty
 
 	@unbind: (context, name = null) ->
 		unbindRoleMethods = (role) ->
@@ -223,23 +225,21 @@ top.Ivento.Dci.Context = class Context
 
 			# Unbind context and promise
 			restore rolePlayer, contextProperty, binding.__oldContext
-			restore rolePlayer, 'promise', binding.__oldPromise
 
 			# Note that only the Role methods are unbound,
 			# the binding itself stays so it can be rebound again when needed.
-			context.__isBound[role] = Context._defaultBinding rolePlayer, contextProperty
+			context.__bindings[role] = Context._defaultBinding rolePlayer, contextProperty
 			context[role] = {}
 		
 		if not name?
-			unbindRoleMethods role for role of context.__isBound
+			unbindRoleMethods role for role of context.__bindings
 		else
 			unbindRoleMethods name
 
 	@_bindingFor: (context, role) ->
-		context.__isBound[role]
+		context.__bindings[role]
 
 	@_defaultBinding: (rolePlayer, contextProperty) ->
 		__rolePlayer: rolePlayer
 		__oldContext: null
-		__oldPromise: null
 		__contextProperty: contextProperty

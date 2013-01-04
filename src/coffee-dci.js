@@ -1,5 +1,6 @@
 (function() {
-  var Context, top, _base;
+  var Context, top, _base,
+    __indexOf = [].indexOf || function(item) { for (var i = 0, l = this.length; i < l; i++) { if (i in this && this[i] === item) return i; } return -1; };
 
   top = this;
 
@@ -84,10 +85,12 @@
       return prop[0] !== '_' && prop !== 'constructor' && Context._isFunction(method);
     };
 
+    Context._reservedProperties = ['bind', 'unbind', 'promise'];
+
     Context.bind = function(context, rolePlayer) {
       var bindContext, bindingFor, createInteraction, doBinding, field, isInteraction, prop, proto, roleMethod, roleMethodName, roleMethods, roleName, unbindContext;
       isInteraction = function(prop) {
-        return prop[0] !== '_' && !(prop === 'constructor' || prop === 'bind' || prop === 'unbind') && Context._isFunction(context[prop]);
+        return prop[0] !== '_' && prop !== 'constructor' && !(__indexOf.call(Context._reservedProperties, prop) >= 0) && Context._isFunction(context[prop]);
       };
       bindingFor = function(roleName) {
         return Context._bindingFor(context, roleName);
@@ -134,9 +137,7 @@
             }
           }
           binding.__oldContext = player[binding.__contextProperty];
-          binding.__oldPromise = player.promise;
           player[binding.__contextProperty] = context;
-          player.promise = context.promise;
         }
         return context[roleName] = player;
       };
@@ -145,7 +146,7 @@
         context.__oldPromise = context.promise;
         context.promise = Context.promise();
         _results = [];
-        for (roleName in context.__isBound) {
+        for (roleName in context.__bindings) {
           _results.push(doBinding(roleName));
         }
         return _results;
@@ -181,6 +182,9 @@
         roleMethods = {};
         for (prop in proto) {
           field = proto[prop];
+          if (proto.hasOwnProperty(prop) && __indexOf.call(Context._reservedProperties, prop) >= 0) {
+            throw "Property '" + prop + "' is reserved in a Context object.";
+          }
           if (isInteraction(prop)) {
             proto[prop].__inContext = true;
           } else if (Context._isRoleObject(prop, field)) {
@@ -200,8 +204,8 @@
           }
         }
       }
-      if (!(context.__isBound != null)) {
-        context.__isBound = {};
+      if (!(context.__bindings != null)) {
+        context.__bindings = {};
         proto = context.constructor.prototype;
         for (prop in proto) {
           field = proto[prop];
@@ -249,7 +253,7 @@
           if (((currentBinding != null ? currentBinding.__rolePlayer : void 0) != null) && currentBinding.__rolePlayer !== rolePlayer) {
             Context.unbind(context, role);
           }
-          return context.__isBound[role] = Context._defaultBinding(rolePlayer, contextProperty);
+          return context.__bindings[role] = Context._defaultBinding(rolePlayer, contextProperty);
         }
       };
     };
@@ -284,13 +288,12 @@
           }
         }
         restore(rolePlayer, contextProperty, binding.__oldContext);
-        restore(rolePlayer, 'promise', binding.__oldPromise);
-        context.__isBound[role] = Context._defaultBinding(rolePlayer, contextProperty);
+        context.__bindings[role] = Context._defaultBinding(rolePlayer, contextProperty);
         return context[role] = {};
       };
       if (!(name != null)) {
         _results = [];
-        for (role in context.__isBound) {
+        for (role in context.__bindings) {
           _results.push(unbindRoleMethods(role));
         }
         return _results;
@@ -300,14 +303,13 @@
     };
 
     Context._bindingFor = function(context, role) {
-      return context.__isBound[role];
+      return context.__bindings[role];
     };
 
     Context._defaultBinding = function(rolePlayer, contextProperty) {
       return {
         __rolePlayer: rolePlayer,
         __oldContext: null,
-        __oldPromise: null,
         __contextProperty: contextProperty
       };
     };
