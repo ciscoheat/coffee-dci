@@ -39,20 +39,24 @@
           }
         }
         this._initialNode = initialNode;
-        this._rebind(this._initialNode, this._unvisited, this._tentativeDistances, this._pathTo);
+        this._rebindNode(this._initialNode);
       }
 
-      ShortestManhattanPath.prototype._rebind = function(newNode, unvisitedSet, tentativeDistances, bestPath) {
+      ShortestManhattanPath.prototype.rebind = function(newNode, unvisitedSet, tentativeDistances, bestPath, distances) {
         var distance;
-        this.bind(this._unvisited).to('unvisitedSet');
-        this.bind(this._tentativeDistances).to('tentativeDistances');
-        this.bind(this._pathTo).to('bestPath');
+        this.bind(unvisitedSet).to('unvisitedSet');
+        this.bind(tentativeDistances).to('tentativeDistances');
+        this.bind(bestPath).to('bestPath');
         this.bind(newNode).to('currentNode');
         this.bind(newNode).to('currentIntersection');
-        distance = this._distances.get(newNode);
+        distance = distances.get(newNode);
         this.bind(distance).to('edge');
         this.bind(distance.east.node).to('eastNeighbor');
         return this.bind(distance.south.node).to('southNeighbor');
+      };
+
+      ShortestManhattanPath.prototype._rebindNode = function(newNode) {
+        return this.rebind(newNode, this._unvisited, this._tentativeDistances, this._pathTo, this._distances);
       };
 
       ShortestManhattanPath.prototype.tentativeDistances = {
@@ -107,7 +111,7 @@
             return this.context.southNeighbor.southNeighborDistance();
           }
         },
-        isSmallestEdgeDistanceTo: function(neighbor) {
+        isBestPathTo: function(neighbor) {
           return this.context.bestPath.put(neighbor, this);
         }
       };
@@ -152,7 +156,7 @@
           distance = this.currentNode.tentativeDistance() + this.currentNode.edgeDistanceTo(neighbor);
           if (distance < this.tentativeDistances.distanceTo(neighbor)) {
             this.tentativeDistances.set(neighbor, distance);
-            this.currentNode.isSmallestEdgeDistanceTo(neighbor);
+            this.currentNode.isBestPathTo(neighbor);
           }
         }
         this.unvisitedSet.remove(this.currentNode);
@@ -160,7 +164,7 @@
           return this.bestPath.fromStartTo(destinationNode);
         }
         nextNode = this.unvisitedSet.smallestTentativeDistanceNode();
-        this._rebind(nextNode, this._unvisited, this._tentativeDistances, this._pathTo);
+        this._rebindNode(nextNode);
         return this.to(destinationNode);
       };
 
