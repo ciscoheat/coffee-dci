@@ -1,4 +1,4 @@
-Coffee-DCI is a library for javascript programming using the DCI paradigm.
+Coffee-DCI is an attempt to create a DCI library for coffee/javascript. The conclusion is that it has problems with deferred/promises, making it unsuitable for anything but experimenting.
 
 For more information about DCI, please see [this very descriptive document](http://www.artima.com/articles/dci_vision.html), [DCI questions on Stackoverflow](http://stackoverflow.com/questions/tagged/dci) or the [object-composition](https://groups.google.com/forum/?fromgroups#!forum/object-composition) group for detailed discussions. For a specific C# implementation, see [this blog post](http://horsdal.blogspot.se/2009/05/dci-in-c.html).
 
